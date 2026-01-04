@@ -193,7 +193,16 @@
   },
 
   "theme": {
-    "title": "Tema"
+    "title": "Tema",
+    "auto_dark_mode": "Modo Oscuro Automático",
+    "system_detection": "Detectar Sistema",
+    "system_detection_desc": "Seguir configuración del sistema",
+    "scheduled_mode": "Modo Programado",
+    "scheduled_mode_desc": "Cambiar automáticamente a horas específicas",
+    "dark_start": "Inicio Modo Oscuro",
+    "dark_end": "Fin Modo Oscuro",
+    "manual_override": "Anulación Manual Activa",
+    "manual_override_desc": "Has cambiado el tema manualmente. El modo automático está pausado."
   },
 
   "language": {
@@ -250,6 +259,40 @@
 
   "support": {
     "enjoying_demo": "Apoya este proyecto"
+  },
+
+  "keyboard": {
+    "shortcuts": "Atajos de Teclado",
+    "customize": "Personalizar Atajos",
+    "reset_defaults": "Restaurar Predeterminados",
+    "save_shortcuts": "Guardar Atajos",
+    "invalid_shortcut": "Atajo inválido",
+    "duplicate_shortcut": "Este atajo ya está en uso",
+    "title": "Atajos de Teclado",
+    "custom_shortcuts": "Atajos personalizados",
+    "custom_shortcuts_desc": "Personalizar los atajos de teclado",
+    "shortcut_new_note": "Nueva nota",
+    "shortcut_new_folder": "Nueva carpeta",
+    "shortcut_save_note": "Guardar nota",
+    "shortcut_delete_note": "Eliminar nota",
+    "shortcut_toggle_sidebar": "Alternar barra lateral",
+    "shortcut_toggle_zen_mode": "Alternar modo zen",
+    "shortcut_search_notes": "Buscar notas",
+    "shortcut_focus_editor": "Enfocar editor",
+    "shortcut_toggle_preview": "Alternar vista previa",
+    "shortcut_export_html": "Exportar HTML",
+    "actions": {
+      "new_note": "Nueva Nota",
+      "new_folder": "Nueva Carpeta",
+      "save_note": "Guardar Nota",
+      "delete_note": "Eliminar Nota",
+      "toggle_sidebar": "Alternar Barra Lateral",
+      "toggle_zen_mode": "Alternar Modo Zen",
+      "search_notes": "Buscar Notas",
+      "focus_editor": "Enfocar Editor",
+      "toggle_preview": "Alternar Vista Previa",
+      "export_html": "Exportar HTML"
+    }
   }
 }
 

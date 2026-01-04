@@ -193,7 +193,16 @@
   },
 
   "theme": {
-    "title": "Theme"
+    "title": "Theme",
+    "auto_dark_mode": "Auto Dark Mode",
+    "system_detection": "System Detection",
+    "system_detection_desc": "Follow system theme settings",
+    "scheduled_mode": "Scheduled Mode",
+    "scheduled_mode_desc": "Switch automatically at specific times",
+    "dark_start": "Dark Mode Start",
+    "dark_end": "Dark Mode End",
+    "manual_override": "Manual Override Active",
+    "manual_override_desc": "You've manually changed the theme. Auto mode is paused."
   },
 
   "language": {
@@ -250,6 +259,25 @@
 
   "support": {
     "enjoying_demo": "Support this project"
+  },
+
+  "keyboard": {
+    "title": "Keyboard Shortcuts",
+    "custom_shortcuts": "Custom Shortcuts",
+    "custom_shortcuts_desc": "Customise keyboard shortcuts",
+    "shortcut_new_note": "New note",
+    "shortcut_new_folder": "New folder",
+    "shortcut_save_note": "Save note",
+    "shortcut_delete_note": "Delete note",
+    "shortcut_toggle_sidebar": "Toggle sidebar",
+    "shortcut_toggle_zen_mode": "Toggle zen mode",
+    "shortcut_search_notes": "Search notes",
+    "shortcut_focus_editor": "Focus editor",
+    "shortcut_toggle_preview": "Toggle preview",
+    "shortcut_export_html": "Export HTML",
+    "reset_defaults": "Reset defaults",
+    "invalid_shortcut": "Invalid shortcut",
+    "duplicate_shortcut": "This shortcut is already in use"
   }
 }
 

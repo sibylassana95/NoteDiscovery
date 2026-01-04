@@ -193,7 +193,16 @@
   },
 
   "theme": {
-    "title": "主题"
+    "title": "主题",
+    "auto_dark_mode": "自动深色模式",
+    "system_detection": "系统检测",
+    "system_detection_desc": "跟随系统主题设置",
+    "scheduled_mode": "定时模式",
+    "scheduled_mode_desc": "在特定时间自动切换",
+    "dark_start": "深色模式开始",
+    "dark_end": "深色模式结束",
+    "manual_override": "手动覆盖已激活",
+    "manual_override_desc": "您已手动更改主题。自动模式已暂停。"
   },
 
   "language": {
@@ -250,6 +259,25 @@
 
   "support": {
     "enjoying_demo": "支持此项目"
+  },
+
+  "keyboard": {
+    "title": "键盘快捷键",
+    "custom_shortcuts": "自定义快捷键",
+    "custom_shortcuts_desc": "自定义键盘快捷键",
+    "shortcut_new_note": "新建笔记",
+    "shortcut_new_folder": "新建文件夹",
+    "shortcut_save_note": "保存笔记",
+    "shortcut_delete_note": "删除笔记",
+    "shortcut_toggle_sidebar": "切换侧边栏",
+    "shortcut_toggle_zen_mode": "切换禅模式",
+    "shortcut_search_notes": "搜索笔记",
+    "shortcut_focus_editor": "聚焦编辑器",
+    "shortcut_toggle_preview": "切换预览",
+    "shortcut_export_html": "导出HTML",
+    "reset_defaults": "重置默认值",
+    "invalid_shortcut": "无效快捷键",
+    "duplicate_shortcut": "此快捷键已被使用"
   }
 }
 

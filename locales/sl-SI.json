@@ -193,7 +193,16 @@
   },
 
   "theme": {
-    "title": "Tema"
+    "title": "Tema",
+    "auto_dark_mode": "Samodejni temni način",
+    "system_detection": "Zaznavanje sistema",
+    "system_detection_desc": "Sledi nastavitvam sistema",
+    "scheduled_mode": "Načrtovani način",
+    "scheduled_mode_desc": "Samodejno preklopi ob določenih časih",
+    "dark_start": "Začetek temnega načina",
+    "dark_end": "Konec temnega načina",
+    "manual_override": "Ročno prekrivanje aktivno",
+    "manual_override_desc": "Ročno ste spremenili temo. Samodejni način je zaustavljen."
   },
 
   "language": {
@@ -250,5 +259,24 @@
 
   "support": {
     "enjoying_demo": "Podprite ta projekt"
+  },
+
+  "keyboard": {
+    "title": "Tipkovne bližnjice",
+    "custom_shortcuts": "Bližnjice po meri",
+    "custom_shortcuts_desc": "Prilagodite tipkovne bližnjice",
+    "shortcut_new_note": "Nov zapis",
+    "shortcut_new_folder": "Nova mapa",
+    "shortcut_save_note": "Shrani zapis",
+    "shortcut_delete_note": "Izbriši zapis",
+    "shortcut_toggle_sidebar": "Preklopi stransko vrstico",
+    "shortcut_toggle_zen_mode": "Preklopi zen način",
+    "shortcut_search_notes": "Išči zapiske",
+    "shortcut_focus_editor": "Fokusiraj urejevalnik",
+    "shortcut_toggle_preview": "Preklopi predogled",
+    "shortcut_export_html": "Izvozi HTML",
+    "reset_defaults": "Ponastavi privzete",
+    "invalid_shortcut": "Neveljavna bližnjica",
+    "duplicate_shortcut": "Ta bližnjica je že v uporabi"
   }
 }

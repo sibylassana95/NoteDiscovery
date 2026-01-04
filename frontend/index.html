@@ -1752,6 +1752,159 @@
                                     <p class="text-xs mt-1" style="color: var(--text-tertiary);" x-text="t('syntax_highlight.description')"></p>
                                 </div>
                                 
+                                <!-- Auto Dark Mode -->
+                                <div class="mb-4">
+                                    <label class="block text-xs font-medium mb-2" style="color: var(--text-secondary);" x-text="t('theme.auto_dark_mode')"></label>
+                                    
+                                    <!-- Enable Auto Dark Mode -->
+                                    <div class="mb-3">
+                                        <label class="flex items-center justify-between cursor-pointer">
+                                            <span class="text-xs" style="color: var(--text-primary);" x-text="t('theme.auto_dark_mode')"></span>
+                                            <div 
+                                                @click="toggleAutoDarkMode()"
+                                                class="relative w-10 h-5 rounded-full transition-colors cursor-pointer"
+                                                :style="autoDarkMode.enabled ? 'background-color: var(--accent-primary)' : 'background-color: var(--bg-tertiary)'"
+                                            >
+                                                <div 
+                                                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform"
+                                                    :style="'background-color: var(--bg-primary);' + (autoDarkMode.enabled ? ' transform: translateX(20px);' : '')"
+                                                ></div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    
+                                    <!-- Manual Override Warning -->
+                                    <div x-show="autoDarkMode.manualOverride" class="mb-3 p-2 rounded text-xs" style="background-color: var(--bg-tertiary); color: var(--text-secondary);">
+                                        <div class="flex items-center justify-between">
+                                            <span x-text="t('theme.manual_override')"></span>
+                                            <button 
+                                                @click="clearManualOverride()"
+                                                class="px-2 py-1 text-xs rounded"
+                                                style="background-color: var(--accent-primary); color: white;"
+                                            >
+                                                Clear
+                                            </button>
+                                        </div>
+                                        <p class="mt-1" x-text="t('theme.manual_override_desc')"></p>
+                                    </div>
+                                    
+                                    <!-- System Detection -->
+                                    <div x-show="autoDarkMode.enabled" class="mb-3">
+                                        <label class="flex items-center justify-between cursor-pointer">
+                                            <div>
+                                                <span class="text-xs" style="color: var(--text-primary);" x-text="t('theme.system_detection')"></span>
+                                                <p class="text-xs" style="color: var(--text-tertiary);" x-text="t('theme.system_detection_desc')"></p>
+                                            </div>
+                                            <div 
+                                                @click="toggleSystemDetection()"
+                                                class="relative w-10 h-5 rounded-full transition-colors cursor-pointer"
+                                                :style="autoDarkMode.systemDetection ? 'background-color: var(--accent-primary)' : 'background-color: var(--bg-tertiary)'"
+                                            >
+                                                <div 
+                                                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform"
+                                                    :style="'background-color: var(--bg-primary);' + (autoDarkMode.systemDetection ? ' transform: translateX(20px);' : '')"
+                                                ></div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    
+                                    <!-- Scheduled Mode -->
+                                    <div x-show="autoDarkMode.enabled" class="mb-3">
+                                        <label class="flex items-center justify-between cursor-pointer">
+                                            <div>
+                                                <span class="text-xs" style="color: var(--text-primary);" x-text="t('theme.scheduled_mode')"></span>
+                                                <p class="text-xs" style="color: var(--text-tertiary);" x-text="t('theme.scheduled_mode_desc')"></p>
+                                            </div>
+                                            <div 
+                                                @click="toggleScheduledMode()"
+                                                class="relative w-10 h-5 rounded-full transition-colors cursor-pointer"
+                                                :style="autoDarkMode.scheduled.enabled ? 'background-color: var(--accent-primary)' : 'background-color: var(--bg-tertiary)'"
+                                            >
+                                                <div 
+                                                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform"
+                                                    :style="'background-color: var(--bg-primary);' + (autoDarkMode.scheduled.enabled ? ' transform: translateX(20px);' : '')"
+                                                ></div>
+                                            </div>
+                                        </label>
+                                        
+                                        <!-- Time Inputs -->
+                                        <div x-show="autoDarkMode.scheduled.enabled" class="mt-2 grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label class="block text-xs mb-1" style="color: var(--text-tertiary);" x-text="t('theme.dark_start')"></label>
+                                                <input 
+                                                    type="time" 
+                                                    x-model="autoDarkMode.scheduled.darkStart"
+                                                    @change="updateScheduledTimes(autoDarkMode.scheduled.darkStart, autoDarkMode.scheduled.darkEnd)"
+                                                    class="w-full px-2 py-1 text-xs rounded"
+                                                    style="background-color: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-primary);"
+                                                >
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs mb-1" style="color: var(--text-tertiary);" x-text="t('theme.dark_end')"></label>
+                                                <input 
+                                                    type="time" 
+                                                    x-model="autoDarkMode.scheduled.darkEnd"
+                                                    @change="updateScheduledTimes(autoDarkMode.scheduled.darkStart, autoDarkMode.scheduled.darkEnd)"
+                                                    class="w-full px-2 py-1 text-xs rounded"
+                                                    style="background-color: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-primary);"
+                                                >
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Keyboard Shortcuts -->
+                                <div class="mb-4">
+                                    <label class="block text-xs font-medium mb-2" style="color: var(--text-secondary);" x-text="t('keyboard.title')"></label>
+                                    
+                                    <!-- Enable Custom Shortcuts -->
+                                    <div class="mb-3">
+                                        <label class="flex items-center justify-between cursor-pointer">
+                                            <div>
+                                                <span class="text-xs" style="color: var(--text-primary);" x-text="t('keyboard.custom_shortcuts')"></span>
+                                                <p class="text-xs" style="color: var(--text-tertiary);" x-text="t('keyboard.custom_shortcuts_desc')"></p>
+                                            </div>
+                                            <div 
+                                                @click="keyboardShortcuts.enabled = !keyboardShortcuts.enabled; saveKeyboardShortcuts()"
+                                                class="relative w-10 h-5 rounded-full transition-colors cursor-pointer"
+                                                :style="keyboardShortcuts.enabled ? 'background-color: var(--accent-primary)' : 'background-color: var(--bg-tertiary)'"
+                                            >
+                                                <div 
+                                                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform"
+                                                    :style="'background-color: var(--bg-primary);' + (keyboardShortcuts.enabled ? ' transform: translateX(20px);' : '')"
+                                                ></div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    
+                                    <!-- Shortcuts Configuration -->
+                                    <div x-show="keyboardShortcuts.enabled" class="space-y-2">
+                                        <template x-for="[action, shortcut] in Object.entries(keyboardShortcuts.shortcuts)" :key="action">
+                                            <div class="flex items-center justify-between text-xs">
+                                                <span style="color: var(--text-primary);" x-text="t('keyboard.shortcut_' + action)"></span>
+                                                <input 
+                                                    type="text" 
+                                                    :value="shortcut"
+                                                    @blur="updateKeyboardShortcut(action, $event.target.value)"
+                                                    @keydown.enter="$event.target.blur()"
+                                                    class="px-2 py-1 text-xs rounded w-24 text-center"
+                                                    style="background-color: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-primary); font-family: monospace;"
+                                                >
+                                            </div>
+                                        </template>
+                                        
+                                        <button 
+                                            @click="resetKeyboardShortcuts()"
+                                            class="w-full px-2 py-1 text-xs rounded mt-2"
+                                            style="background-color: var(--bg-tertiary); color: var(--text-secondary);"
+                                            onmouseover="this.style.backgroundColor='var(--bg-hover)'"
+                                            onmouseout="this.style.backgroundColor='var(--bg-tertiary)'"
+                                            x-text="t('keyboard.reset_defaults')"
+                                        >
+                                        </button>
+                                    </div>
+                                </div>
+                                
                                 <!-- Logout (if auth enabled) - uses authEnabled from main app state -->
                                 <div x-show="authEnabled" class="mb-4">
                                     <label class="block text-xs font-medium mb-2" style="color: var(--text-secondary);" x-text="t('settings.account')"></label>

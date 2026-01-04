@@ -193,7 +193,16 @@
   },
 
   "theme": {
-    "title": "Thème"
+    "title": "Thème",
+    "auto_dark_mode": "Mode sombre automatique",
+    "system_detection": "Suivre le système",
+    "system_detection_desc": "Utilise le thème sombre/clair du système",
+    "scheduled_mode": "Mode programmé",
+    "scheduled_mode_desc": "Basculer automatiquement selon l'heure",
+    "dark_start": "Début mode sombre",
+    "dark_end": "Fin mode sombre",
+    "manual_override": "Choix manuel actif",
+    "manual_override_desc": "Votre sélection manuelle remplace l'automatique"
   },
 
   "language": {
@@ -205,6 +214,34 @@
     "description": "Coloriser la syntaxe markdown dans l'éditeur",
     "enable": "Activer la coloration syntaxique",
     "disable": "Désactiver la coloration syntaxique"
+  },
+
+  "keyboard": {
+    "title": "Raccourcis Clavier",
+    "custom_shortcuts": "Raccourcis personnalisés",
+    "custom_shortcuts_desc": "Personnaliser les raccourcis clavier",
+    "shortcut_new_note": "Nouvelle note",
+    "shortcut_new_folder": "Nouveau dossier",
+    "shortcut_save_note": "Enregistrer la note",
+    "shortcut_delete_note": "Supprimer la note",
+    "shortcut_toggle_sidebar": "Basculer la barre latérale",
+    "shortcut_toggle_zen_mode": "Basculer le mode zen",
+    "shortcut_search_notes": "Rechercher des notes",
+    "shortcut_focus_editor": "Focaliser l'éditeur",
+    "shortcut_toggle_preview": "Basculer l'aperçu",
+    "shortcut_export_html": "Exporter en HTML",
+    "shortcut_save": "Enregistrer",
+    "shortcut_search": "Rechercher",
+    "shortcut_zen_mode": "Mode zen",
+    "shortcut_bold": "Gras",
+    "shortcut_italic": "Italique",
+    "shortcut_link": "Lien",
+    "shortcut_table": "Tableau",
+    "shortcut_undo": "Annuler",
+    "shortcut_redo": "Rétablir",
+    "reset_defaults": "Réinitialiser",
+    "invalid_shortcut": "Raccourci invalide",
+    "duplicate_shortcut": "Ce raccourci est déjà utilisé"
   },
 
   "settings": {

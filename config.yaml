@@ -20,6 +20,17 @@ storage:
   notes_dir: "./data"
   plugins_dir: "./plugins"
   
+# UI preferences
+ui:
+  # Default theme (can be overridden by user preference)
+  default_theme: "light"
+  # Theme switching behavior
+  theme_switching:
+    # Smooth transition between themes
+    smooth_transition: true
+    # Remember user's manual theme choice
+    remember_manual_choice: true
+  
 search:
   enabled: true
   
@@ -41,4 +52,40 @@ authentication:
   
   # Session expiry in seconds (default: 7 days)
   session_max_age: 604800
+
+# Theme settings
+theme:
+  # Auto dark mode settings
+  auto_dark_mode:
+    enabled: true
+    # System detection: follow system preference
+    system_detection: true
+    # Scheduled mode: switch at specific times
+    scheduled:
+      enabled: false
+      dark_start: "20:00"  # Start dark mode at 8 PM
+      dark_end: "07:00"    # End dark mode at 7 AM
+
+# Keyboard shortcuts settings
+keyboard:
+  # Enable custom keyboard shortcuts
+  custom_shortcuts: true
+  # Configurable shortcuts (key combinations)
+  shortcuts:
+    # File operations
+    new_note: "Ctrl+Alt+N"
+    new_folder: "Ctrl+Alt+F"
+    save: "Ctrl+S"
+    delete: "Delete"
+    # Navigation
+    search: "Ctrl+F"
+    zen_mode: "Ctrl+Alt+Z"
+    # Formatting
+    bold: "Ctrl+B"
+    italic: "Ctrl+I"
+    link: "Ctrl+K"
+    table: "Ctrl+Alt+T"
+    # Undo/Redo
+    undo: "Ctrl+Z"
+    redo: "Ctrl+Y"
 

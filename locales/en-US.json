@@ -193,7 +193,16 @@
   },
 
   "theme": {
-    "title": "Theme"
+    "title": "Theme",
+    "auto_dark_mode": "Auto Dark Mode",
+    "system_detection": "Follow System",
+    "system_detection_desc": "Use system dark/light theme preference",
+    "scheduled_mode": "Scheduled Mode",
+    "scheduled_mode_desc": "Switch automatically based on time",
+    "dark_start": "Dark mode start",
+    "dark_end": "Dark mode end",
+    "manual_override": "Manual override active",
+    "manual_override_desc": "Your manual selection overrides automatic switching"
   },
 
   "language": {
@@ -205,6 +214,26 @@
     "description": "Colorize markdown syntax in editor",
     "enable": "Enable syntax highlighting",
     "disable": "Disable syntax highlighting"
+  },
+
+  "keyboard": {
+    "title": "Keyboard Shortcuts",
+    "custom_shortcuts": "Custom Shortcuts",
+    "custom_shortcuts_desc": "Customize keyboard shortcuts",
+    "shortcut_new_note": "New note",
+    "shortcut_new_folder": "New folder",
+    "shortcut_save": "Save",
+    "shortcut_search": "Search",
+    "shortcut_zen_mode": "Zen mode",
+    "shortcut_bold": "Bold",
+    "shortcut_italic": "Italic",
+    "shortcut_link": "Link",
+    "shortcut_table": "Table",
+    "shortcut_undo": "Undo",
+    "shortcut_redo": "Redo",
+    "reset_defaults": "Reset to defaults",
+    "invalid_shortcut": "Invalid shortcut",
+    "duplicate_shortcut": "This shortcut is already in use"
   },
 
   "settings": {

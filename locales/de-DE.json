@@ -193,7 +193,16 @@
   },
 
   "theme": {
-    "title": "Design"
+    "title": "Design",
+    "auto_dark_mode": "Automatischer Dunkelmodus",
+    "system_detection": "Systemerkennung",
+    "system_detection_desc": "Systemeinstellungen folgen",
+    "scheduled_mode": "Geplanter Modus",
+    "scheduled_mode_desc": "Automatisch zu bestimmten Zeiten wechseln",
+    "dark_start": "Dunkelmodus Start",
+    "dark_end": "Dunkelmodus Ende",
+    "manual_override": "Manuelle Überschreibung Aktiv",
+    "manual_override_desc": "Du hast das Design manuell geändert. Der automatische Modus ist pausiert."
   },
 
   "language": {
@@ -250,6 +259,40 @@
 
   "support": {
     "enjoying_demo": "Unterstütze dieses Projekt"
+  },
+
+  "keyboard": {
+    "shortcuts": "Tastaturkürzel",
+    "customize": "Kürzel Anpassen",
+    "reset_defaults": "Standardwerte Zurücksetzen",
+    "save_shortcuts": "Kürzel Speichern",
+    "invalid_shortcut": "Ungültiges Kürzel",
+    "duplicate_shortcut": "Dieses Kürzel wird bereits verwendet",
+    "title": "Tastaturkürzel",
+    "custom_shortcuts": "Benutzerdefinierte Kürzel",
+    "custom_shortcuts_desc": "Tastaturkürzel anpassen",
+    "shortcut_new_note": "Neue Notiz",
+    "shortcut_new_folder": "Neuer Ordner",
+    "shortcut_save_note": "Notiz speichern",
+    "shortcut_delete_note": "Notiz löschen",
+    "shortcut_toggle_sidebar": "Seitenleiste umschalten",
+    "shortcut_toggle_zen_mode": "Zen-Modus umschalten",
+    "shortcut_search_notes": "Notizen durchsuchen",
+    "shortcut_focus_editor": "Editor fokussieren",
+    "shortcut_toggle_preview": "Vorschau umschalten",
+    "shortcut_export_html": "HTML exportieren",
+    "actions": {
+      "new_note": "Neue Notiz",
+      "new_folder": "Neuer Ordner",
+      "save_note": "Notiz Speichern",
+      "delete_note": "Notiz Löschen",
+      "toggle_sidebar": "Seitenleiste Umschalten",
+      "toggle_zen_mode": "Zen-Modus Umschalten",
+      "search_notes": "Notizen Durchsuchen",
+      "focus_editor": "Editor Fokussieren",
+      "toggle_preview": "Vorschau Umschalten",
+      "export_html": "HTML Exportieren"
+    }
   }
 }
 

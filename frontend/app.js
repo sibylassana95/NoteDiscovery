@@ -175,6 +175,36 @@ function noteApp() {
         currentTheme: 'light',
         availableThemes: [],
         
+        // Auto dark mode state
+        autoDarkMode: {
+            enabled: true,
+            systemDetection: true,
+            scheduled: {
+                enabled: false,
+                darkStart: '20:00',
+                darkEnd: '07:00'
+            },
+            manualOverride: false // User manually selected a theme
+        },
+        
+        // Keyboard shortcuts state
+        keyboardShortcuts: {
+            enabled: true,
+            shortcuts: {
+                new_note: 'Ctrl+Alt+N',
+                new_folder: 'Ctrl+Alt+F',
+                save: 'Ctrl+S',
+                search: 'Ctrl+F',
+                zen_mode: 'Ctrl+Alt+Z',
+                bold: 'Ctrl+B',
+                italic: 'Ctrl+I',
+                link: 'Ctrl+K',
+                table: 'Ctrl+Alt+T',
+                undo: 'Ctrl+Z',
+                redo: 'Ctrl+Y'
+            }
+        },
+        
         // Locale/i18n state
         currentLocale: localStorage.getItem('locale') || 'en-US',
         availableLocales: [],
@@ -434,6 +464,7 @@ function noteApp() {
             await this.loadConfig();
             await this.loadThemes();
             await this.initTheme();
+            await this.initAutoDarkMode();
             await this.loadAvailableLocales();
             // Note: Translations are preloaded synchronously before Alpine init (see index.html)
             // loadLocale() is only called when user changes language from settings
@@ -447,6 +478,8 @@ function noteApp() {
             this.loadFavorites();
             this.loadFavoritesExpanded();
             this.loadSyntaxHighlightSetting();
+            this.loadAutoDarkModeSettings();
+            this.loadKeyboardShortcuts();
             
             // Parse URL and load specific note if provided
             this.loadNoteFromURL();
@@ -547,50 +580,44 @@ function noteApp() {
             if (!window.__noteapp_shortcuts_initialized) {
                 window.__noteapp_shortcuts_initialized = true;
                 window.addEventListener('keydown', (e) => {
-                    // Use e.code for all letter keys for consistency across keyboard layouts
+                    // Skip if custom shortcuts are disabled
+                    if (!this.keyboardShortcuts.enabled) {
+                        // Use default shortcuts
+                        this.handleDefaultShortcuts(e);
+                        return;
+                    }
                     
-                    // Ctrl/Cmd + S to save
-                    if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') {
+                    // Check custom shortcuts
+                    const shortcuts = this.keyboardShortcuts.shortcuts;
+                    
+                    // File operations
+                    if (this.matchesShortcut(e, shortcuts.save)) {
                         e.preventDefault();
                         this.saveNote();
                     }
-                    
-                    // Ctrl/Cmd + Alt/Option + N for new note
-                    if ((e.ctrlKey || e.metaKey) && e.altKey && e.code === 'KeyN') {
+                    else if (this.matchesShortcut(e, shortcuts.new_note)) {
                         e.preventDefault();
                         this.createNote();
                     }
-                    
-                    // Ctrl/Cmd + Alt/Option + F for new folder
-                    if ((e.ctrlKey || e.metaKey) && e.altKey && e.code === 'KeyF') {
+                    else if (this.matchesShortcut(e, shortcuts.new_folder)) {
                         e.preventDefault();
                         this.createFolder();
                     }
-                    
-                    // Ctrl/Cmd + Z for undo (without shift or alt)
-                    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.code === 'KeyZ') {
+                    else if (this.matchesShortcut(e, shortcuts.undo)) {
                         e.preventDefault();
                         this.undo();
                     }
-                    
-                    // Ctrl/Cmd + Y OR Ctrl/Cmd+Shift+Z for redo
-                    if ((e.ctrlKey || e.metaKey) && e.code === 'KeyY') {
+                    else if (this.matchesShortcut(e, shortcuts.redo)) {
                         e.preventDefault();
                         this.redo();
                     }
-                    if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.code === 'KeyZ') {
-                        e.preventDefault();
-                        this.redo();
-                    }
-                    
-                    // F3 for next search match
-                    if (e.code === 'F3' && !e.shiftKey) {
+                    // F3 for next search match (not configurable)
+                    else if (e.code === 'F3' && !e.shiftKey) {
                         e.preventDefault();
                         this.nextMatch();
                     }
-                    
-                    // Shift + F3 for previous search match
-                    if (e.code === 'F3' && e.shiftKey) {
+                    // Shift + F3 for previous search match (not configurable)
+                    else if (e.code === 'F3' && e.shiftKey) {
                         e.preventDefault();
                         this.previousMatch();
                     }
@@ -598,38 +625,29 @@ function noteApp() {
                     // Only apply markdown shortcuts when editor is focused and a note is open
                     const isEditorFocused = document.activeElement?.id === 'note-editor';
                     if (isEditorFocused && this.currentNote) {
-                        // Ctrl/Cmd + B for bold
-                        if ((e.ctrlKey || e.metaKey) && e.code === 'KeyB') {
+                        if (this.matchesShortcut(e, shortcuts.bold)) {
                             e.preventDefault();
                             this.wrapSelection('**', '**', 'bold text');
                         }
-                        
-                        // Ctrl/Cmd + I for italic
-                        if ((e.ctrlKey || e.metaKey) && e.code === 'KeyI') {
+                        else if (this.matchesShortcut(e, shortcuts.italic)) {
                             e.preventDefault();
                             this.wrapSelection('*', '*', 'italic text');
                         }
-                        
-                        // Ctrl/Cmd + K for link
-                        if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') {
+                        else if (this.matchesShortcut(e, shortcuts.link)) {
                             e.preventDefault();
                             this.insertLink();
                         }
-                        
-                        // Ctrl/Cmd + Alt/Option + T for table
-                        if ((e.ctrlKey || e.metaKey) && e.altKey && e.code === 'KeyT') {
+                        else if (this.matchesShortcut(e, shortcuts.table)) {
                             e.preventDefault();
                             this.insertTable();
                         }
-                        
-                        // Ctrl/Cmd + Alt/Option + Z for Zen mode
-                        if ((e.ctrlKey || e.metaKey) && e.altKey && e.code === 'KeyZ') {
+                        else if (this.matchesShortcut(e, shortcuts.zen_mode)) {
                             e.preventDefault();
                             this.toggleZenMode();
                         }
                     }
                     
-                    // Escape to exit Zen mode (works anywhere)
+                    // Escape to exit Zen mode (works anywhere, not configurable)
                     if (e.key === 'Escape' && this.zenMode) {
                         e.preventDefault();
                         this.toggleZenMode();
@@ -642,8 +660,13 @@ function noteApp() {
             // Listen for system theme changes
             if (window.matchMedia) {
                 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                    if (this.currentTheme === 'system') {
-                        this.applyTheme('system');
+                    if (this.autoDarkMode.enabled && this.autoDarkMode.systemDetection && !this.autoDarkMode.manualOverride) {
+                        const targetTheme = e.matches ? 'dark' : 'light';
+                        if (this.currentTheme !== targetTheme) {
+                            this.currentTheme = targetTheme;
+                            localStorage.setItem('noteDiscoveryTheme', targetTheme);
+                            this.applyTheme(targetTheme);
+                        }
                     }
                 });
             }
@@ -698,10 +721,344 @@ function noteApp() {
             await this.applyTheme(savedTheme);
         },
         
+        // Initialize auto dark mode
+        async initAutoDarkMode() {
+            if (!this.autoDarkMode.enabled) return;
+            
+            // Check if user has manual override active
+            if (this.autoDarkMode.manualOverride) return;
+            
+            let shouldUseDark = false;
+            
+            if (this.autoDarkMode.systemDetection) {
+                // Follow system preference
+                shouldUseDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            } else if (this.autoDarkMode.scheduled.enabled) {
+                // Use scheduled mode
+                shouldUseDark = this.isInDarkTimeRange();
+            }
+            
+            const targetTheme = shouldUseDark ? 'dark' : 'light';
+            if (this.currentTheme !== targetTheme) {
+                this.currentTheme = targetTheme;
+                localStorage.setItem('noteDiscoveryTheme', targetTheme);
+                await this.applyTheme(targetTheme);
+            }
+            
+            // Set up periodic check for scheduled mode
+            if (this.autoDarkMode.scheduled.enabled) {
+                this.setupScheduledThemeCheck();
+            }
+        },
+        
+        // Check if current time is in dark mode range
+        isInDarkTimeRange() {
+            const now = new Date();
+            const currentTime = now.getHours() * 60 + now.getMinutes();
+            
+            const [darkStartHour, darkStartMin] = this.autoDarkMode.scheduled.darkStart.split(':').map(Number);
+            const [darkEndHour, darkEndMin] = this.autoDarkMode.scheduled.darkEnd.split(':').map(Number);
+            
+            const darkStart = darkStartHour * 60 + darkStartMin;
+            const darkEnd = darkEndHour * 60 + darkEndMin;
+            
+            if (darkStart < darkEnd) {
+                // Same day range (e.g., 09:00 to 17:00)
+                return currentTime >= darkStart && currentTime < darkEnd;
+            } else {
+                // Overnight range (e.g., 20:00 to 07:00)
+                return currentTime >= darkStart || currentTime < darkEnd;
+            }
+        },
+        
+        // Setup periodic check for scheduled theme switching
+        setupScheduledThemeCheck() {
+            // Check every minute
+            setInterval(() => {
+                if (!this.autoDarkMode.enabled || !this.autoDarkMode.scheduled.enabled || this.autoDarkMode.manualOverride) {
+                    return;
+                }
+                
+                const shouldUseDark = this.isInDarkTimeRange();
+                const targetTheme = shouldUseDark ? 'dark' : 'light';
+                
+                if (this.currentTheme !== targetTheme) {
+                    this.currentTheme = targetTheme;
+                    localStorage.setItem('noteDiscoveryTheme', targetTheme);
+                    this.applyTheme(targetTheme);
+                }
+            }, 60000); // 60 seconds
+        },
+        
+        // Load auto dark mode settings
+        loadAutoDarkModeSettings() {
+            try {
+                const saved = localStorage.getItem('autoDarkModeSettings');
+                if (saved) {
+                    const settings = JSON.parse(saved);
+                    this.autoDarkMode = { ...this.autoDarkMode, ...settings };
+                }
+            } catch (error) {
+                console.error('Error loading auto dark mode settings:', error);
+            }
+        },
+        
+        // Save auto dark mode settings
+        saveAutoDarkModeSettings() {
+            try {
+                localStorage.setItem('autoDarkModeSettings', JSON.stringify(this.autoDarkMode));
+            } catch (error) {
+                console.error('Error saving auto dark mode settings:', error);
+            }
+        },
+        
+        // Toggle auto dark mode
+        toggleAutoDarkMode() {
+            this.autoDarkMode.enabled = !this.autoDarkMode.enabled;
+            this.saveAutoDarkModeSettings();
+            
+            if (this.autoDarkMode.enabled && !this.autoDarkMode.manualOverride) {
+                this.initAutoDarkMode();
+            }
+        },
+        
+        // Toggle system detection
+        toggleSystemDetection() {
+            this.autoDarkMode.systemDetection = !this.autoDarkMode.systemDetection;
+            this.saveAutoDarkModeSettings();
+            
+            if (this.autoDarkMode.enabled && !this.autoDarkMode.manualOverride) {
+                this.initAutoDarkMode();
+            }
+        },
+        
+        // Toggle scheduled mode
+        toggleScheduledMode() {
+            this.autoDarkMode.scheduled.enabled = !this.autoDarkMode.scheduled.enabled;
+            this.saveAutoDarkModeSettings();
+            
+            if (this.autoDarkMode.enabled && !this.autoDarkMode.manualOverride) {
+                this.initAutoDarkMode();
+            }
+        },
+        
+        // Update scheduled times
+        updateScheduledTimes(darkStart, darkEnd) {
+            this.autoDarkMode.scheduled.darkStart = darkStart;
+            this.autoDarkMode.scheduled.darkEnd = darkEnd;
+            this.saveAutoDarkModeSettings();
+            
+            if (this.autoDarkMode.enabled && this.autoDarkMode.scheduled.enabled && !this.autoDarkMode.manualOverride) {
+                this.initAutoDarkMode();
+            }
+        },
+        
+        // Clear manual override
+        clearManualOverride() {
+            this.autoDarkMode.manualOverride = false;
+            this.saveAutoDarkModeSettings();
+            
+            if (this.autoDarkMode.enabled) {
+                this.initAutoDarkMode();
+            }
+        },
+        
+        // Load keyboard shortcuts settings
+        loadKeyboardShortcuts() {
+            try {
+                const saved = localStorage.getItem('keyboardShortcuts');
+                if (saved) {
+                    const settings = JSON.parse(saved);
+                    this.keyboardShortcuts = { ...this.keyboardShortcuts, ...settings };
+                }
+            } catch (error) {
+                console.error('Error loading keyboard shortcuts:', error);
+            }
+        },
+        
+        // Save keyboard shortcuts settings
+        saveKeyboardShortcuts() {
+            try {
+                localStorage.setItem('keyboardShortcuts', JSON.stringify(this.keyboardShortcuts));
+            } catch (error) {
+                console.error('Error saving keyboard shortcuts:', error);
+            }
+        },
+        
+        // Update a keyboard shortcut
+        updateKeyboardShortcut(action, shortcut) {
+            // Validate shortcut format
+            if (!this.isValidShortcut(shortcut)) {
+                alert(this.t('keyboard.invalid_shortcut'));
+                return false;
+            }
+            
+            // Check for duplicates
+            const existing = Object.entries(this.keyboardShortcuts.shortcuts)
+                .find(([key, value]) => key !== action && value === shortcut);
+            
+            if (existing) {
+                alert(this.t('keyboard.duplicate_shortcut'));
+                return false;
+            }
+            
+            this.keyboardShortcuts.shortcuts[action] = shortcut;
+            this.saveKeyboardShortcuts();
+            return true;
+        },
+        
+        // Validate shortcut format
+        isValidShortcut(shortcut) {
+            // Basic validation for keyboard shortcuts
+            const validPattern = /^(Ctrl|Alt|Shift|Meta)?(\+)?(Ctrl|Alt|Shift|Meta)?(\+)?(Ctrl|Alt|Shift|Meta)?(\+)?([A-Za-z0-9]|F[1-9]|F1[0-2]|Delete|Backspace|Enter|Space|Tab|Escape)$/;
+            return validPattern.test(shortcut) || /^[A-Za-z0-9]$/.test(shortcut);
+        },
+        
+        // Reset keyboard shortcuts to defaults
+        resetKeyboardShortcuts() {
+            this.keyboardShortcuts.shortcuts = {
+                new_note: 'Ctrl+Alt+N',
+                new_folder: 'Ctrl+Alt+F',
+                save: 'Ctrl+S',
+                search: 'Ctrl+F',
+                zen_mode: 'Ctrl+Alt+Z',
+                bold: 'Ctrl+B',
+                italic: 'Ctrl+I',
+                link: 'Ctrl+K',
+                table: 'Ctrl+Alt+T',
+                undo: 'Ctrl+Z',
+                redo: 'Ctrl+Y'
+            };
+            this.saveKeyboardShortcuts();
+        },
+        
+        // Check if shortcut matches current event
+        matchesShortcut(event, shortcut) {
+            const parts = shortcut.split('+');
+            const key = parts[parts.length - 1];
+            const modifiers = parts.slice(0, -1);
+            
+            // Check key match
+            let keyMatch = false;
+            if (key.length === 1) {
+                keyMatch = event.key.toLowerCase() === key.toLowerCase();
+            } else {
+                keyMatch = event.code === key || event.key === key;
+            }
+            
+            if (!keyMatch) return false;
+            
+            // Check modifiers
+            const hasCtrl = modifiers.includes('Ctrl');
+            const hasAlt = modifiers.includes('Alt');
+            const hasShift = modifiers.includes('Shift');
+            const hasMeta = modifiers.includes('Meta');
+            
+            return (event.ctrlKey === hasCtrl || event.metaKey === hasMeta) &&
+                   event.altKey === hasAlt &&
+                   event.shiftKey === hasShift;
+        },
+        
+        // Handle default shortcuts when custom shortcuts are disabled
+        handleDefaultShortcuts(e) {
+            // Use e.code for all letter keys for consistency across keyboard layouts
+            
+            // Ctrl/Cmd + S to save
+            if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') {
+                e.preventDefault();
+                this.saveNote();
+            }
+            
+            // Ctrl/Cmd + Alt/Option + N for new note
+            if ((e.ctrlKey || e.metaKey) && e.altKey && e.code === 'KeyN') {
+                e.preventDefault();
+                this.createNote();
+            }
+            
+            // Ctrl/Cmd + Alt/Option + F for new folder
+            if ((e.ctrlKey || e.metaKey) && e.altKey && e.code === 'KeyF') {
+                e.preventDefault();
+                this.createFolder();
+            }
+            
+            // Ctrl/Cmd + Z for undo (without shift or alt)
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.code === 'KeyZ') {
+                e.preventDefault();
+                this.undo();
+            }
+            
+            // Ctrl/Cmd + Y OR Ctrl/Cmd+Shift+Z for redo
+            if ((e.ctrlKey || e.metaKey) && e.code === 'KeyY') {
+                e.preventDefault();
+                this.redo();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.code === 'KeyZ') {
+                e.preventDefault();
+                this.redo();
+            }
+            
+            // F3 for next search match
+            if (e.code === 'F3' && !e.shiftKey) {
+                e.preventDefault();
+                this.nextMatch();
+            }
+            
+            // Shift + F3 for previous search match
+            if (e.code === 'F3' && e.shiftKey) {
+                e.preventDefault();
+                this.previousMatch();
+            }
+            
+            // Only apply markdown shortcuts when editor is focused and a note is open
+            const isEditorFocused = document.activeElement?.id === 'note-editor';
+            if (isEditorFocused && this.currentNote) {
+                // Ctrl/Cmd + B for bold
+                if ((e.ctrlKey || e.metaKey) && e.code === 'KeyB') {
+                    e.preventDefault();
+                    this.wrapSelection('**', '**', 'bold text');
+                }
+                
+                // Ctrl/Cmd + I for italic
+                if ((e.ctrlKey || e.metaKey) && e.code === 'KeyI') {
+                    e.preventDefault();
+                    this.wrapSelection('*', '*', 'italic text');
+                }
+                
+                // Ctrl/Cmd + K for link
+                if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') {
+                    e.preventDefault();
+                    this.insertLink();
+                }
+                
+                // Ctrl/Cmd + Alt/Option + T for table
+                if ((e.ctrlKey || e.metaKey) && e.altKey && e.code === 'KeyT') {
+                    e.preventDefault();
+                    this.insertTable();
+                }
+                
+                // Ctrl/Cmd + Alt/Option + Z for Zen mode
+                if ((e.ctrlKey || e.metaKey) && e.altKey && e.code === 'KeyZ') {
+                    e.preventDefault();
+                    this.toggleZenMode();
+                }
+            }
+            
+            // Escape to exit Zen mode (works anywhere)
+            if (e.key === 'Escape' && this.zenMode) {
+                e.preventDefault();
+                this.toggleZenMode();
+            }
+        },
+        
         // Set and apply theme
         async setTheme(themeId) {
             this.currentTheme = themeId;
             localStorage.setItem('noteDiscoveryTheme', themeId);
+            
+            // Mark as manual override if user explicitly selects a theme
+            this.autoDarkMode.manualOverride = true;
+            this.saveAutoDarkModeSettings();
+            
             await this.applyTheme(themeId);
         },
         
