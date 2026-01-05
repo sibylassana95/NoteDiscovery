@@ -24,6 +24,8 @@ storage:
 ui:
   # Default theme (can be overridden by user preference)
   default_theme: "light"
+  # Default language (can be overridden by user preference)
+  default_language: "fr-FR"
   # Theme switching behavior
   theme_switching:
     # Smooth transition between themes

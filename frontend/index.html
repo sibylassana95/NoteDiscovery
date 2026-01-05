@@ -32,7 +32,7 @@
     <script>
         (function() {
             // Load translations synchronously to ensure they're available before Alpine renders
-            const locale = localStorage.getItem('locale') || 'en-US';
+            const locale = localStorage.getItem('locale') || 'fr-FR';
             const xhr = new XMLHttpRequest();
             xhr.open('GET', '/api/locales/' + locale, false); // Synchronous request
             try {

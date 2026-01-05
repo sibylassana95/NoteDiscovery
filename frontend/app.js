@@ -206,7 +206,7 @@ function noteApp() {
         },
         
         // Locale/i18n state
-        currentLocale: localStorage.getItem('locale') || 'en-US',
+        currentLocale: localStorage.getItem('locale') || 'fr-FR',
         availableLocales: [],
         // Translations loaded from backend (preloaded before Alpine init via window.__preloadedTranslations)
         translations: window.__preloadedTranslations || {},
