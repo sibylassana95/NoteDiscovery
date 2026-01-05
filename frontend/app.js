@@ -948,15 +948,20 @@ function noteApp() {
             
             if (!keyMatch) return false;
             
-            // Check modifiers
-            const hasCtrl = modifiers.includes('Ctrl');
-            const hasAlt = modifiers.includes('Alt');
-            const hasShift = modifiers.includes('Shift');
-            const hasMeta = modifiers.includes('Meta');
+            // Check modifiers - must match EXACTLY
+            const expectedCtrl = modifiers.includes('Ctrl');
+            const expectedAlt = modifiers.includes('Alt');
+            const expectedShift = modifiers.includes('Shift');
+            const expectedMeta = modifiers.includes('Meta');
             
-            return (event.ctrlKey === hasCtrl || event.metaKey === hasMeta) &&
-                   event.altKey === hasAlt &&
-                   event.shiftKey === hasShift;
+            // All modifier states must match exactly
+            const actualCtrl = event.ctrlKey || event.metaKey;
+            const actualAlt = event.altKey;
+            const actualShift = event.shiftKey;
+            
+            return actualCtrl === expectedCtrl &&
+                   actualAlt === expectedAlt &&
+                   actualShift === expectedShift;
         },
         
         // Handle default shortcuts when custom shortcuts are disabled
