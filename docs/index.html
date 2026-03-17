@@ -7,8 +7,8 @@
     <!-- Primary Meta Tags -->
     <title>NoteDiscovery - Your Self-Hosted Knowledge Base</title>
     <meta name="title" content="NoteDiscovery - Your Self-Hosted Knowledge Base">
-    <meta name="description" content="A lightweight, privacy-focused Markdown note-taking application with wikilinks, graph view, LaTeX math, Mermaid diagrams, tags, templates, and code highlighting. Self-hosted, free, and open source.">
-    <meta name="keywords" content="note taking, markdown editor, self-hosted, knowledge base, open source, privacy, notes app, docker, second brain, obsidian alternative, notion, evernote, onenote, latex, mermaid, diagrams, math equations, templates, tags, yaml frontmatter">
+    <meta name="description" content="A lightweight, privacy-focused Markdown note-taking application with AI assistant integration (MCP), wikilinks, graph view, LaTeX math, Mermaid diagrams, tags, templates, and code highlighting. Works with Claude, Cursor, and other AI tools. Self-hosted, free, and open source.">
+    <meta name="keywords" content="note taking, markdown editor, self-hosted, knowledge base, open source, privacy, notes app, docker, second brain, obsidian alternative, notion, evernote, onenote, latex, mermaid, diagrams, math equations, templates, tags, yaml frontmatter, AI assistant, MCP, model context protocol, Claude, Cursor, AI notes, AI knowledge base, AI-powered notes">
     <meta name="author" content="Gamosoft">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://www.notediscovery.com">
@@ -17,7 +17,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://www.notediscovery.com">
     <meta property="og:title" content="NoteDiscovery - Your Self-Hosted Knowledge Base">
-    <meta property="og:description" content="A lightweight, privacy-focused Markdown note-taking application with wikilinks, LaTeX math, Mermaid diagrams, tags, templates, and code highlighting. Self-hosted, free, and open source.">
+    <meta property="og:description" content="AI-powered note-taking with MCP integration for Claude, Cursor & more. LaTeX math, Mermaid diagrams, graph view, wikilinks. Self-hosted, free, and open source.">
     <meta property="og:image" content="https://www.notediscovery.com/og-image.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
@@ -28,7 +28,7 @@
     <meta name="twitter:site" content="@gamosoft">
     <meta name="twitter:creator" content="@gamosoft">
     <meta name="twitter:title" content="NoteDiscovery - Your Self-Hosted Knowledge Base">
-    <meta name="twitter:description" content="A lightweight, privacy-focused note-taking application with LaTeX math, Mermaid diagrams, tags, templates, and code highlighting. Self-hosted, free, and open source.">
+    <meta name="twitter:description" content="AI-powered note-taking with MCP integration for Claude & Cursor. LaTeX, Mermaid diagrams, graph view. Self-hosted, free, open source.">
     <meta name="twitter:image" content="https://www.notediscovery.com/og-image.png">
     <meta name="twitter:image:alt" content="NoteDiscovery - Self-hosted note-taking application interface">
     
@@ -353,7 +353,7 @@
             animation: fadeInScale 0.6s ease-out forwards;
         }
 
-        /* Stagger animation delays for feature cards */
+        /* Stagger animation delays for feature cards (5 rows × 3 cols = 15 cards) */
         .feature.animated:nth-child(1) { animation-delay: 0s; }
         .feature.animated:nth-child(2) { animation-delay: 0.1s; }
         .feature.animated:nth-child(3) { animation-delay: 0.2s; }
@@ -367,6 +367,8 @@
         .feature.animated:nth-child(11) { animation-delay: 0.25s; }
         .feature.animated:nth-child(12) { animation-delay: 0.35s; }
         .feature.animated:nth-child(13) { animation-delay: 0.2s; }
+        .feature.animated:nth-child(14) { animation-delay: 0.3s; }
+        .feature.animated:nth-child(15) { animation-delay: 0.4s; }
 
         .screenshot-section {
             margin: 4rem 0 3rem 0;
@@ -687,12 +689,18 @@
         <div class="hero animate-on-scroll">
             <div class="hero-content">
                 <h2>Take Control of Your Notes</h2>
-                <p>A lightweight, privacy-focused note-taking application with powerful features: LaTeX math equations, Mermaid diagrams, smart tags, custom templates, code highlighting, and more. Write, organize, and discover your notes with a beautiful, modern interface—all running on your own server.</p>
+                <p>A lightweight, privacy-focused note-taking application with powerful features: AI assistant integration (MCP), LaTeX math equations, Mermaid diagrams, smart tags, custom templates, code highlighting, and more. Write and organize your notes with a beautiful, modern interface all running on your own server.</p>
                 <div class="cta-buttons">
                     <a href="https://gamosoft-notediscovery-demo.hf.space" class="cta-button demo" target="_blank" rel="noopener">Try Live Demo</a>
                     <a href="https://github.com/gamosoft/NoteDiscovery" class="cta-button" target="_blank" rel="noopener">Get Started on GitHub →</a>
                 </div>
                 <p class="demo-notice">✨ Demo resets daily · For demonstration purposes only</p>
+                <div class="pikapods-deploy" style="margin-top: 1.5rem;">
+                    <p style="margin-bottom: 0.75rem; font-size: 0.95rem;">☁️ Or deploy your own instance in one click:</p>
+                    <a href="https://www.pikapods.com/pods?run=notediscovery" target="_blank" rel="noopener">
+                        <img src="https://www.pikapods.com/static/run-button.svg" alt="Run on PikaPods" style="height: 40px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                    </a>
+                </div>
             </div>
         </div>
 
@@ -833,9 +841,9 @@
             </div>
 
             <div class="feature animate-on-scroll">
-                <div class="feature-icon">🚀</div>
-                <h3>Lightning Fast</h3>
-                <p>Instant search and navigation. Works offline, always responsive.</p>
+                <div class="feature-icon">🤖</div>
+                <h3>AI Assistant Ready</h3>
+                <p>MCP integration lets Claude, Cursor & other AI tools search, create, and organize your notes.</p>
             </div>
 
             <div class="feature animate-on-scroll">
@@ -866,12 +874,6 @@
                 <div class="feature-icon">📋</div>
                 <h3>Note Templates</h3>
                 <p>Create from custom templates with dynamic placeholders. Meeting notes, journals, and more.</p>
-            </div>
-
-            <div class="feature animate-on-scroll">
-                <div class="feature-icon">🔗</div>
-                <h3>Wikilinks</h3>
-                <p>Link notes with [[double brackets]] Obsidian-style. Jump to sections with [[note#heading]] anchors.</p>
             </div>
 
             <div class="feature animate-on-scroll">
@@ -909,6 +911,13 @@
                 <h3>Extensible</h3>
                 <p>Plugin system lets you add custom features and integrations.</p>
             </div>
+
+            <div class="feature animate-on-scroll">
+                <div class="feature-icon">📲</div>
+                <h3>Install as App</h3>
+                <p>Progressive Web App (PWA) - install on desktop or mobile for a native experience.</p>
+            </div>
+
         </div>
 
         <div class="benefits animate-on-scroll">
@@ -947,38 +956,6 @@
                 </div>
 
                 <div class="benefit-item">
-                    <span class="emoji">🌙</span>
-                    <div class="text">
-                        <strong>Dark Mode</strong>
-                        Easy on the eyes
-                    </div>
-                </div>
-
-                <div class="benefit-item">
-                    <span class="emoji">💻</span>
-                    <div class="text">
-                        <strong>Self-Hosted</strong>
-                        You own your data
-                    </div>
-                </div>
-
-                <div class="benefit-item">
-                    <span class="emoji">🔗</span>
-                    <div class="text">
-                        <strong>Wikilinks</strong>
-                        [[Link notes]] Obsidian-style
-                    </div>
-                </div>
-
-                <div class="benefit-item">
-                    <span class="emoji">🕸️</span>
-                    <div class="text">
-                        <strong>Graph View</strong>
-                        Visualize note connections
-                    </div>
-                </div>
-
-                <div class="benefit-item">
                     <span class="emoji">🖼️</span>
                     <div class="text">
                         <strong>Image Support</strong>
@@ -1003,6 +980,14 @@
                 </div>
 
                 <div class="benefit-item">
+                    <span class="emoji">🔍</span>
+                    <div class="text">
+                        <strong>Quick Switcher</strong>
+                        Jump to any note with a shortcut
+                    </div>
+                </div>
+
+                <div class="benefit-item">
                     <span class="emoji">🔐</span>
                     <div class="text">
                         <strong>Optional Auth</strong>
@@ -1011,10 +996,26 @@
                 </div>
 
                 <div class="benefit-item">
-                    <span class="emoji">⚙️</span>
+                    <span class="emoji">🌐</span>
                     <div class="text">
-                        <strong>Properties Panel</strong>
-                        View frontmatter metadata at a glance
+                        <strong>Public Sharing</strong>
+                        Share notes via link, even with auth enabled
+                    </div>
+                </div>
+
+                <div class="benefit-item">
+                    <span class="emoji">🔗</span>
+                    <div class="text">
+                        <strong>Wikilinks</strong>
+                        [[Link notes]] Obsidian-style
+                    </div>
+                </div>
+
+                <div class="benefit-item">
+                    <span class="emoji">🌍</span>
+                    <div class="text">
+                        <strong>Multi-Language</strong>
+                        English, Spanish, German, French
                     </div>
                 </div>
             </div>
@@ -1029,6 +1030,12 @@
                     <a href="https://github.com/gamosoft/NoteDiscovery" class="cta-button" target="_blank" rel="noopener">View on GitHub →</a>
                 </div>
                 <p class="demo-notice">✨ Demo resets daily · For demonstration purposes only</p>
+                <div class="pikapods-deploy" style="margin-top: 1.5rem;">
+                    <p style="margin-bottom: 0.75rem; font-size: 0.95rem;">☁️ Don't want to self-host? Deploy on PikaPods:</p>
+                    <a href="https://www.pikapods.com/pods?run=notediscovery" target="_blank" rel="noopener">
+                        <img src="https://www.pikapods.com/static/run-button.svg" alt="Run on PikaPods" style="height: 40px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                    </a>
+                </div>
             </div>
         </div>
 
@@ -1055,12 +1062,17 @@
             const icon = document.getElementById('theme-icon');
             icon.textContent = newTheme === 'light' ? '🌙' : '☀️';
         }
+        
+        function getBrowserThemePreference() {
+            const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            return prefersDarkMode ? 'dark' : 'light';
+        }
 
         // Load saved theme on page load
         (function() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
+            const savedTheme = localStorage.getItem('theme') || getBrowserThemePreference();
             document.documentElement.setAttribute('data-theme', savedTheme);
-            
+
             // Update icon
             const icon = document.getElementById('theme-icon');
             icon.textContent = savedTheme === 'light' ? '🌙' : '☀️';
@@ -1179,11 +1191,11 @@
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "name": "NoteDiscovery",
-      "description": "A lightweight, Obsidian and Evernote alternative, privacy-focused Markdown note-taking application with LaTeX math, Mermaid diagrams, and code highlighting. Self-hosted, free, and open source.",
+      "description": "A lightweight, AI-powered Markdown note-taking application with MCP integration for Claude, Cursor and other AI assistants. Features LaTeX math, Mermaid diagrams, graph view, and code highlighting. Self-hosted Obsidian and Evernote alternative. Free and open source.",
       "url": "https://www.notediscovery.com",
       "applicationCategory": "ProductivityApplication",
       "operatingSystem": "Linux, Windows, macOS",
-      "featureList": "Markdown editor, Wikilinks, Graph view, LaTeX math equations, Mermaid diagrams, Code syntax highlighting, Dark mode, Plugin system, Internal links, Properties panel, HTML export, Full-text search, Self-hosted, Obsidian, Evernote, Notion, Onenote, Second brain",
+      "featureList": "AI assistant integration, MCP (Model Context Protocol), Claude integration, Cursor integration, Markdown editor, Wikilinks, Graph view, LaTeX math equations, Mermaid diagrams, Code syntax highlighting, Dark mode, Plugin system, Internal links, Properties panel, HTML export, Full-text search, Self-hosted, Obsidian alternative, Evernote alternative, Notion alternative, Second brain, AI-powered notes",
       "offers": {
         "@type": "Offer",
         "price": "0",

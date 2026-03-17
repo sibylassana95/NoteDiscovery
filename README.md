@@ -9,10 +9,6 @@
 
 > Your Self-Hosted Knowledge Base
 
-🌐 **[Visit the official website](https://www.notediscovery.com)**
-
-🚀 **[Try the Live Demo](https://gamosoft-notediscovery-demo.hf.space)** — *Contents reset daily, for demonstration purposes only*
-
 ## What is NoteDiscovery?
 
 NoteDiscovery is a **lightweight, self-hosted note-taking application** that puts you in complete control of your knowledge base. Write, organize, and discover your notes with a beautiful, modern interface—all running on your own server.
@@ -27,13 +23,20 @@ NoteDiscovery is a **lightweight, self-hosted note-taking application** that put
 - **Teams** looking for a self-hosted alternative to commercial apps
 - **Anyone** who values simplicity, speed, and ownership
 
-
-## 💖 Thanks for using NoteDiscovery!
-If this project has been useful to you, consider supporting its development, it truly makes a difference!
+---
 
 <p align="center">
-  <a href="https://ko-fi.com/gamosoft" target="_blank" rel="noopener noreferrer"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Buy Me a Coffee at ko-fi.com"></a>
+  <a href="https://www.notediscovery.com"><img src="docs/website-button.svg" alt="Official Website"></a>
+  &nbsp;&nbsp;
+  <a href="https://gamosoft-notediscovery-demo.hf.space"><img src="docs/demo-button.svg" alt="Try Live Demo"></a>
 </p>
+<p align="center">
+  <a href="https://www.pikapods.com/pods?run=notediscovery"><img src="https://www.pikapods.com/static/run-button.svg" alt="Run on PikaPods"></a>
+  &nbsp;&nbsp;
+  <a href="https://ko-fi.com/gamosoft"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Buy Me a Coffee at ko-fi.com"></a>
+</p>
+
+---
 
 ## ✨ Why NoteDiscovery?
 
@@ -63,6 +66,41 @@ If this project has been useful to you, consider supporting its development, it 
 - 🕸️ **Graph View** - Interactive visualization of connected notes
 - ⭐ **Favorites** - Star your most-used notes for instant access
 - 📑 **Outline Panel** - Navigate headings with click-to-jump TOC
+- 🤖 **AI Assistant Ready** - MCP integration for Claude, Cursor & more
+
+## 🤖 AI-Powered Note Management
+
+<p align="center">
+  <img src="https://img.shields.io/badge/MCP-Compatible-blueviolet?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTEyIDJhMTAgMTAgMCAxIDAgMTAgMTBIMTJWMnoiLz48cGF0aCBkPSJNMjEuMTggOC44MmMtLjI4LS40LS43Mi0uODItMS4xOC0uODJoLTNjLS40NiAwLS45LjQyLTEuMTguODItLjI4LjQtLjMyLjk4LS4xMiAxLjQybDEuNSAzYy4yLjQ0LjY2LjcgMS4xMi43aDEuMzZjLjQ2IDAgLjkyLS4yNiAxLjEyLS43bDEuNS0zYy4yLS40NC4xNi0xLjAyLS4xMi0xLjQyeiIvPjwvc3ZnPg==" alt="MCP Compatible">
+  <img src="https://img.shields.io/badge/Works%20with-Claude-orange?style=for-the-badge" alt="Works with Claude">
+  <img src="https://img.shields.io/badge/Works%20with-Cursor-blue?style=for-the-badge" alt="Works with Cursor">
+</p>
+
+NoteDiscovery includes a built-in **Model Context Protocol (MCP)** server, letting AI assistants directly interact with your notes:
+
+| What AI Can Do | Example |
+|----------------|---------|
+| 🔍 **Search & Discover** | *"Find all my notes about Docker deployment"* |
+| 📝 **Create & Edit** | *"Create a meeting notes template for tomorrow"* |
+| 📁 **Organize** | *"Move all project notes to the archive folder"* |
+| 🏷️ **Tag & Categorize** | *"List all notes tagged with #urgent"* |
+| 📊 **Explore Connections** | *"Show me the knowledge graph of my notes"* |
+| ✍️ **Append Ideas** | *"Add this thought to my daily journal"* |
+
+**One-line setup** for Cursor, Claude Desktop, and other MCP-compatible tools:
+
+```json
+{
+  "mcpServers": {
+    "notediscovery": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "-e", "NOTEDISCOVERY_URL=http://host.docker.internal:8000", "ghcr.io/gamosoft/notediscovery:latest", "python", "-m", "mcp_server"]
+    }
+  }
+}
+```
+
+> 💡 **See [MCP.md](documentation/MCP.md)** for complete setup instructions and all available tools.
 
 ## 🚀 Quick Start
 
@@ -146,6 +184,33 @@ python run.py
 - Python 3.8 or higher
 - pip (Python package manager)
 
+#### Using Virtual Environments (Recommended for Arch/Fedora/Ubuntu 23.04+)
+
+Modern Linux distributions enforce [PEP 668](https://peps.python.org/pep-0668/), which prevents system-wide pip installs. Use a virtual environment instead:
+
+```bash
+# Clone the repository
+git clone https://github.com/gamosoft/notediscovery.git
+cd notediscovery
+
+# Create a virtual environment
+python -m venv venv
+
+# Activate it (choose your shell):
+source venv/bin/activate        # Bash/Zsh (most Linux distros)
+source venv/bin/activate.fish   # Fish (CachyOS, etc.)
+source venv/bin/activate.csh    # Csh/Tcsh
+.\venv\Scripts\activate         # Windows PowerShell
+
+# Install dependencies and run
+pip install -r requirements.txt
+python run.py
+```
+
+> ⚠️ **Warning**
+>
+> *You'll need to activate the virtual environment (source venv/bin/activate) each time you open a new terminal before running the app*
+
 ### Advanced Docker Setup
 
 The image includes bundled config, themes, plugins, and locales. To customize, you must:
@@ -181,6 +246,7 @@ Want to learn more?
 - 📊 **[MERMAID.md](documentation/MERMAID.md)** - Diagram creation with Mermaid (flowcharts, sequence diagrams, and more)
 - 🔌 **[PLUGINS.md](documentation/PLUGINS.md)** - Plugin system and available plugins
 - 🌐 **[API.md](documentation/API.md)** - REST API documentation and examples
+- 🤖 **[MCP.md](documentation/MCP.md)** - AI assistant integration (Claude, Cursor, and more)
 - 🔐 **[AUTHENTICATION.md](documentation/AUTHENTICATION.md)** - Enable password protection for your instance
 - 🔧 **[ENVIRONMENT_VARIABLES.md](documentation/ENVIRONMENT_VARIABLES.md)** - Configure settings via environment variables
 
@@ -237,7 +303,6 @@ NoteDiscovery is designed for **self-hosted, private use**. Please keep these se
 - ⚠️ **ENABLE AUTHENTICATION AND CHANGE THE DEFAULT PASSWORD** if exposing to a network!
 - See **[AUTHENTICATION.md](documentation/AUTHENTICATION.md)** for complete setup instructions
 - To disable auth, set `authentication.enabled: false` in `config.yaml`
-- Change password with Docker: `docker-compose exec notediscovery python generate_password.py`
 - Perfect for single-user or small team deployments
 - For multi-user setups, consider a reverse proxy with OAuth/SSO
 

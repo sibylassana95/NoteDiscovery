@@ -63,6 +63,9 @@
     <!-- Marked.js for Markdown parsing (v12.0.2) -->
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
     
+    <!-- DOMPurify for HTML sanitization (XSS prevention) -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+    
     <!-- MathJax for LaTeX math rendering -->
     <script>
         MathJax = {
@@ -109,6 +112,8 @@
     
     <!-- vis-network for graph visualization (v9.1.9) -->
     <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+    <!-- QR Code generator for share links -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     
     <!-- Theme styles will be loaded dynamically -->
     <link rel="stylesheet" id="theme-stylesheet" href="">
@@ -168,6 +173,13 @@
             line-height: 1.8;
             color: var(--text-primary);
             font-size: 16px;
+        }
+        
+        /* Readable line length - constrain text width for better readability */
+        .markdown-preview.readable-width {
+            max-width: 750px;
+            margin-left: auto;
+            margin-right: auto;
         }
         
         /* Remove top margin from first element */
@@ -444,6 +456,92 @@
             margin: 1rem 0;
         }
         
+        /* Embedded Media (audio, video, PDF) */
+        .markdown-preview .media-embed {
+            margin: 1.5rem 0;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        
+        /* Audio embeds */
+        .markdown-preview .media-audio {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+            border: 1px solid var(--border-primary);
+        }
+        .markdown-preview .media-audio audio {
+            width: 100%;
+            max-width: 500px;
+            border-radius: 2rem;
+        }
+        .markdown-preview .media-audio .media-caption {
+            margin-top: 0.75rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        
+        /* Video embeds */
+        .markdown-preview .media-video {
+            background: #000;
+            display: flex;
+            justify-content: center;
+        }
+        .markdown-preview .media-video video {
+            width: 100%;
+            max-width: 800px;
+            max-height: 450px;
+            border-radius: 0;
+        }
+        
+        /* PDF embeds (iframe) */
+        .markdown-preview .media-pdf {
+            border: 1px solid var(--border-primary);
+            border-radius: 0.5rem;
+            overflow: hidden;
+            background: var(--bg-secondary);
+        }
+        .markdown-preview .media-pdf iframe {
+            width: 100%;
+            height: 600px;
+            border: none;
+            display: block;
+        }
+        
+        /* PDF links (for external PDFs) */
+        .markdown-preview .pdf-link {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            padding: 1rem 1.25rem;
+            margin: 1rem 0;
+            background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+            border: 1px solid var(--border-primary);
+            border-radius: 0.5rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: all 0.15s ease;
+        }
+        .markdown-preview .pdf-link:hover {
+            background: var(--bg-secondary);
+            border-color: var(--accent-primary);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .markdown-preview .pdf-link:hover .pdf-link-content {
+            color: var(--accent-primary);
+        }
+        .markdown-preview .pdf-link-content {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .markdown-preview .pdf-link-note {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        
         /* Task lists */
         .markdown-preview input[type="checkbox"] {
             margin-right: 0.5rem;
@@ -496,7 +594,8 @@
             background-color: var(--bg-primary) !important;
             color: var(--text-primary) !important;
             resize: none;
-            overflow: auto;
+            overflow-y: scroll; /* Always show scrollbar for consistent text width */
+            overflow-x: auto;
         }
         
         /* Syntax Highlighting Overlay */
@@ -521,16 +620,30 @@
             position: absolute;
             inset: 0;
             pointer-events: none;
-            overflow: auto;
+            overflow-y: scroll; /* Match textarea scrollbar space */
+            overflow-x: auto; /* Match textarea for horizontal scroll sync */
             color: var(--text-primary);
             background-color: var(--bg-primary);
             z-index: 0;
-            /* Hide scrollbars but allow programmatic scrolling */
-            scrollbar-width: none; /* Firefox */
-            -ms-overflow-style: none; /* IE/Edge */
         }
+        /* Invisible scrollbar that takes EXACT same space as textarea */
         .syntax-overlay::-webkit-scrollbar {
-            display: none; /* Chrome/Safari */
+            width: 12px;
+            height: 12px;
+            background: transparent;
+        }
+        .syntax-overlay::-webkit-scrollbar-track {
+            background: var(--bg-tertiary); /* MUST match textarea track */
+        }
+        .syntax-overlay::-webkit-scrollbar-thumb {
+            background: transparent;
+            border-radius: 6px;
+            border: 2px solid transparent; /* MUST match textarea's 2px border */
+        }
+        /* Firefox - MUST match textarea's scrollbar-width: thin */
+        .syntax-overlay {
+            scrollbar-width: thin;
+            scrollbar-color: transparent var(--bg-tertiary);
         }
         
         /* Zen Mode Styles */
@@ -612,11 +725,14 @@
         /* Folder tree styling - compact Obsidian-like */
         .folder-item {
             user-select: none;
-            border-radius: 4px;
+            border-radius: 6px;
+            border-left: 3px solid transparent;
+            margin-left: 2px;
         }
         
         .folder-item:hover {
             background-color: var(--bg-hover);
+            border-left-color: var(--accent-primary);
         }
         
         .folder-item.drag-over {
@@ -629,11 +745,55 @@
         }
         
         .note-item {
-            border-radius: 4px;
+            border-radius: 6px;
+            border-left: 3px solid transparent;
+            margin-left: 2px;
         }
         
         .note-item:hover {
             background-color: var(--bg-hover);
+            border-left-color: var(--accent-primary);
+            transform: translateX(2px);
+        }
+        
+        /* Active/selected note styling */
+        .note-item.active,
+        .note-item[style*="accent-light"] {
+            border-left-color: var(--accent-primary) !important;
+            font-weight: 500;
+        }
+        
+        /* Shared hover accent effect for list items */
+        .hover-accent {
+            border-radius: 6px;
+            border-left: 3px solid transparent;
+            margin-left: 2px;
+            transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+        }
+        
+        .hover-accent:not(.active):hover {
+            background-color: var(--bg-hover);
+            border-left-color: var(--accent-primary);
+            transform: translateX(2px);
+        }
+        
+        .hover-accent.active {
+            border-left-color: var(--accent-primary);
+        }
+        
+        .hover-accent.active:hover {
+            transform: translateX(2px);
+        }
+        
+        /* Tag chip - same effect but no margin */
+        .tag-chip {
+            border-left: 3px solid transparent;
+            transition: border-color 0.15s ease, transform 0.1s ease;
+        }
+        
+        .tag-chip:hover {
+            border-left-color: var(--accent-primary);
+            transform: translateX(2px);
         }
         
         /* Drag and drop improvements */
@@ -645,12 +805,13 @@
         .note-item[draggable="true"]:active,
         .folder-item[draggable="true"]:active {
             cursor: grabbing;
+            transform: scale(0.98);
         }
         
         /* Smooth transitions for drag states */
         .folder-item,
         .note-item {
-            transition: background-color 0.15s ease, border-color 0.15s ease;
+            transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
         }
         
         /* Better drop zone visibility */
@@ -847,6 +1008,12 @@
             
             .mobile-bottom-tab span {
                 font-size: 10px;
+            }
+            
+            /* Zen mode mobile adjustments - use 95% width instead of fixed padding */
+            .zen-mode-active .zen-editor-container {
+                padding: 1rem 2.5%;
+                width: 100%;
             }
             
         }
@@ -1154,6 +1321,16 @@
                 display: none !important;
             }
         }
+        
+        /* Responsive homepage cards */
+        .homepage-card {
+            min-height: 70px;
+        }
+        @media (min-width: 640px) {
+            .homepage-card {
+                min-height: 140px;
+            }
+        }
     </style>
 </head>
 <body x-data="noteApp()" x-init="init()" style="background-color: var(--bg-primary);" :class="{'zen-mode-active': zenMode}">
@@ -1356,18 +1533,16 @@
                                 <template x-for="fav in favoriteNotes" :key="fav.path">
                                     <div 
                                         @click="loadNote(fav.path)"
-                                        class="flex items-center justify-between px-2 py-1.5 rounded cursor-pointer group"
-                                        :class="{'bg-opacity-50': currentNote === fav.path}"
+                                        class="hover-accent flex items-center justify-between px-2 py-1.5 cursor-pointer group"
+                                        :class="{'active': currentNote === fav.path}"
                                         :style="currentNote === fav.path ? 'background-color: var(--accent-primary); color: white;' : 'color: var(--text-secondary);'"
                                         :title="fav.path"
-                                        @mouseenter="if (currentNote !== fav.path) $el.style.backgroundColor = 'var(--bg-hover)'"
-                                        @mouseleave="if (currentNote !== fav.path) $el.style.backgroundColor = 'transparent'"
                                     >
                                         <div class="flex items-center gap-1.5 min-w-0 flex-1">
                                             <svg class="w-3.5 h-3.5 flex-shrink-0" style="color: var(--warning, #eab308);" fill="currentColor" viewBox="0 0 24 24">
                                                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
                                             </svg>
-                                            <span class="text-xs truncate" x-text="fav.name"></span>
+                                            <span class="text-xs truncate" x-text="fav.name" :title="fav.name"></span>
                                         </div>
                                         <button 
                                             @click.stop="toggleFavorite(fav.path)"
@@ -1388,79 +1563,57 @@
                         <div class="text-xs px-2 py-1 mb-2" style="color: var(--text-tertiary);">
                             <div class="flex items-center justify-between mb-1">
                                 <span x-text="t('sidebar.folders_and_notes')"></span>
-                                <div class="flex gap-1">
+                                <div class="flex gap-0.5">
                                     <button 
                                         @click="expandAllFolders()"
-                                        class="text-xs px-2 py-0.5 rounded hover:bg-opacity-20"
-                                        style="color: var(--text-secondary);"
+                                        class="text-xs px-1.5 py-0.5 rounded transition-all hover:scale-110"
                                         :title="t('sidebar.expand_all')"
-                                    >⊞</button>
+                                        style="opacity: 0.7;"
+                                        onmouseover="this.style.opacity='1'"
+                                        onmouseout="this.style.opacity='0.7'"
+                                    >📂</button>
                                     <button 
                                         @click="collapseAllFolders()"
-                                        class="text-xs px-2 py-0.5 rounded hover:bg-opacity-20"
-                                        style="color: var(--text-secondary);"
+                                        class="text-xs px-1.5 py-0.5 rounded transition-all hover:scale-110"
                                         :title="t('sidebar.collapse_all')"
-                                    >⊟</button>
+                                        style="opacity: 0.7;"
+                                        onmouseover="this.style.opacity='1'"
+                                        onmouseout="this.style.opacity='0.7'"
+                                    >📁</button>
                                 </div>
                             </div>
                             <!-- Dual-purpose: hint text OR root drop zone when dragging -->
                             <div 
                                 class="text-xs px-2 py-1 mb-2 rounded transition-all font-medium text-center"
                                 :class="{
-                                    'border-2 border-dashed bg-accent-light': (draggedNote || draggedFolder) && dragOverFolder === '',
-                                    'border-2 border-dashed': (draggedNote || draggedFolder) && dragOverFolder !== '',
-                                    'border-2 border-transparent': !draggedNote && !draggedFolder
+                                    'border-2 border-dashed bg-accent-light': draggedItem && dragOverFolder === '',
+                                    'border-2 border-dashed': draggedItem && dragOverFolder !== '',
+                                    'border-2 border-transparent': !draggedItem
                                 }"
                                 :style="{
-                                    'color': (draggedNote || draggedFolder) ? (dragOverFolder === '' ? 'var(--accent-primary)' : 'var(--text-secondary)') : 'var(--text-tertiary)',
-                                    'opacity': (draggedNote || draggedFolder) ? '1' : '0.8',
-                                    'border-color': (draggedNote || draggedFolder) && dragOverFolder === '' ? 'var(--accent-primary)' : 'var(--border-secondary)',
+                                    'color': draggedItem ? (dragOverFolder === '' ? 'var(--accent-primary)' : 'var(--text-secondary)') : 'var(--text-tertiary)',
+                                    'opacity': draggedItem ? '1' : '0.8',
+                                    'border-color': draggedItem && dragOverFolder === '' ? 'var(--accent-primary)' : 'var(--border-secondary)',
                                     'background-color': dragOverFolder === '' ? 'var(--accent-light)' : ''
                                 }"
-                                @dragover.prevent="if(draggedNote || draggedFolder) dragOverFolder = '';"
-                                @dragenter.prevent="if(draggedNote || draggedFolder) dragOverFolder = '';"
-                                @dragleave="if(draggedNote || draggedFolder) dragOverFolder = null;"
-                                @drop="if(draggedNote || draggedFolder) onFolderDrop('')"
+                                @dragover.prevent="if(draggedItem) dragOverFolder = '';"
+                                @dragenter.prevent="if(draggedItem) dragOverFolder = '';"
+                                @dragleave="if(draggedItem) dragOverFolder = null;"
+                                @drop="if(draggedItem) onFolderDrop('')"
                                 style="height: 28px; line-height: 20px; display: flex; align-items: center; justify-content: center;"
                             >
-                                <span x-show="!draggedNote && !draggedFolder && !draggedItem" x-text="t('sidebar.drag_hint')"></span>
-                                <span x-show="draggedNote || draggedFolder" x-text="t('sidebar.root_folder')"></span>
+                                <span x-show="!draggedItem" x-text="t('sidebar.drag_hint')"></span>
+                                <span x-show="draggedItem" x-text="t('sidebar.root_folder')"></span>
                             </div>
                         </div>
                         
                         <!-- Folders (rendered recursively for unlimited nesting) -->
-                        <template x-for="[folderKey, folder] in Object.entries(folderTree).filter(([k]) => k !== '__root__').sort((a, b) => a[1].name.toLowerCase().localeCompare(b[1].name.toLowerCase()))" :key="folderKey">
+                        <template x-for="[folderKey, folder] in Object.entries(folderTree).filter(([k, v]) => k !== '__root__' && (!hideUnderscoreFolders || !v.name.startsWith('_'))).sort((a, b) => a[1].name.toLowerCase().localeCompare(b[1].name.toLowerCase()))" :key="folderKey">
                             <div x-html="renderFolderRecursive(folder, 0, true)"></div>
                         </template>
                         
-                        <!-- Root notes and images (no folder) - shown after folders -->
-                        <template x-for="note in (folderTree.__root__ && folderTree.__root__.notes ? folderTree.__root__.notes : [])" :key="note.path">
-                            <div 
-                                draggable="true"
-                                @dragstart="onNoteDragStart(note.path, $event)"
-                                @dragend="onNoteDragEnd()"
-                                @click="openItem(note.path, note.type)"
-                                class="note-item px-2 py-1 text-sm relative"
-                                :style="((note.type === 'image' ? currentImage === note.path : currentNote === note.path) ? 'background-color: var(--accent-light); color: var(--accent-primary);' : 'color: var(--text-primary);') + (note.type === 'image' ? ' opacity: 0.85;' : '') + (draggedNote || draggedFolder ? ' cursor: grabbing;' : ' cursor: pointer;')"
-                                @mouseover="if(currentNote !== note.path && currentImage !== note.path) $el.style.backgroundColor='var(--bg-hover)'"
-                                @mouseout="if(currentNote !== note.path && currentImage !== note.path) $el.style.backgroundColor='transparent'"
-                            >
-                                <span class="truncate" style="display: block; padding-right: 30px;">
-                                    <template x-if="note.type === 'image'">🖼️ </template>
-                                    <span x-text="note.name"></span>
-                                </span>
-                                <button 
-                                    @click.stop="note.type === 'image' ? deleteImage(note.path) : deleteNote(note.path, note.name)"
-                                    class="note-delete-btn absolute right-2 top-1/2 transform -translate-y-1/2 px-1 py-0.5 text-xs rounded hover:brightness-110 transition-opacity"
-                                    style="opacity: 0; color: var(--error);"
-                                    :title="note.type === 'image' ? t('toolbar.delete_image') : t('toolbar.delete_note')"
-                                >
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </template>
+                        <!-- Root notes and images (no folder) - rendered via JS for consistency -->
+                        <div x-html="renderRootItems()"></div>
                         
                         <!-- Empty state -->
                         <template x-if="notes.length === 0 && allFolders.length === 0">
@@ -1486,7 +1639,7 @@
                             <input 
                                 type="text" 
                                 x-model="searchQuery"
-                                @input="searchNotes()"
+                                @input="debouncedSearchNotes()"
                                 :placeholder="t('sidebar.search_placeholder')"
                                 class="w-full px-2 py-1.5 pl-7 pr-7 text-xs rounded focus:outline-none focus:ring-1"
                                 style="background-color: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-primary);"
@@ -1535,23 +1688,27 @@
                                 <template x-for="note in searchResults" :key="note.path">
                                     <div 
                                         @click="openItem(note.path, note.type, searchQuery)"
-                                        class="px-2 py-1.5 text-sm cursor-pointer rounded mb-1"
+                                        class="hover-accent px-2 py-1.5 text-sm cursor-pointer mb-1"
+                                        :class="{'active': currentNote === note.path}"
                                         :style="currentNote === note.path ? 'background-color: var(--accent-light); color: var(--accent-primary);' : 'color: var(--text-primary);'"
-                                        onmouseover="if(this.style.backgroundColor !== 'var(--accent-light)') this.style.backgroundColor='var(--bg-hover)'"
-                                        onmouseout="if(this.style.backgroundColor !== 'var(--accent-light)') this.style.backgroundColor='transparent'"
                                     >
-                                        <div class="font-medium truncate" x-text="note.name"></div>
-                                        <div class="text-xs truncate" style="color: var(--text-tertiary);" x-html="(note.matches && note.matches.length > 0) ? note.matches[0].context : (note.folder || 'Root')"></div>
+                                        <div class="font-medium truncate" x-text="note.name" :title="note.name"></div>
+                                        <div class="text-xs truncate" style="color: var(--text-tertiary);" x-html="(note.matches && note.matches.length > 0) ? note.matches[0].context : (note.folder || 'Root')" :title="note.folder || 'Root'"></div>
                     </div>
                 </template>
             </div>
                         </template>
-                        <template x-if="searchQuery.trim() && searchResults.length === 0">
+                        <template x-if="searchQuery.trim() && isSearching">
+                            <div class="p-6 text-center">
+                                <p class="text-sm" style="color: var(--text-tertiary);" x-text="t('search.searching', {query: searchQuery})"></p>
+                            </div>
+                        </template>
+                        <template x-if="searchQuery.trim() && !isSearching && searchResults.length === 0">
                             <div class="p-6 text-center">
                                 <svg class="w-12 h-12 mx-auto mb-3 opacity-40" style="color: var(--text-tertiary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
-                                <p class="text-sm" style="color: var(--text-tertiary);">No notes contain "<span x-text="searchQuery"></span>"</p>
+                                <p class="text-sm" style="color: var(--text-tertiary);" x-text="t('search.no_results', {query: searchQuery})"></p>
                             </div>
                         </template>
                         <template x-if="!searchQuery.trim()">
@@ -1598,7 +1755,7 @@
                                     <template x-for="[tag, count] in sortedTags" :key="tag">
                                         <button 
                                             @click="toggleTag(tag)"
-                                            class="px-2 py-1 text-xs rounded-full transition-all hover:brightness-110"
+                                            class="tag-chip px-2 py-1 text-xs rounded-full"
                                             :style="selectedTags.includes(tag) 
                                                 ? 'background-color: var(--accent-primary); color: white; font-weight: 600;'
                                                 : 'background-color: var(--bg-tertiary); color: var(--text-primary);'"
@@ -1631,12 +1788,11 @@
                                     <template x-for="note in searchResults" :key="note.path">
                                         <div 
                                             @click="openItem(note.path, note.type)"
-                                            class="px-3 py-1.5 text-sm cursor-pointer"
+                                            class="hover-accent px-3 py-1.5 text-sm cursor-pointer"
+                                            :class="{'active': currentNote === note.path}"
                                             :style="currentNote === note.path ? 'background-color: var(--accent-light); color: var(--accent-primary);' : 'color: var(--text-primary);'"
-                                            onmouseover="if(this.style.backgroundColor !== 'var(--accent-light)') this.style.backgroundColor='var(--bg-hover)'"
-                                            onmouseout="if(this.style.backgroundColor !== 'var(--accent-light)') this.style.backgroundColor='transparent'"
                                         >
-                                            <span class="truncate block" x-text="note.name"></span>
+                                            <span class="truncate block" x-text="note.name" :title="note.name"></span>
                                         </div>
                                     </template>
                                     <div x-show="searchResults.length === 0" class="px-3 py-4 text-center text-xs" style="color: var(--text-tertiary);" x-text="t('tags.no_matches')">
@@ -1665,15 +1821,14 @@
                                     <template x-for="(heading, index) in outline" :key="index">
                                         <button 
                                             @click="scrollToHeading(heading)"
-                                            class="w-full text-left px-3 py-1.5 text-sm transition-colors hover:brightness-110"
+                                            class="hover-accent w-full text-left px-3 py-1.5 text-sm"
                                             :style="`padding-left: ${(heading.level - 1) * 12 + 12}px; color: var(--text-primary);`"
-                                            onmouseover="this.style.backgroundColor='var(--bg-hover)'"
-                                            onmouseout="this.style.backgroundColor='transparent'"
                                         >
                                             <span 
                                                 class="block truncate"
                                                 :style="heading.level === 1 ? 'font-weight: 600;' : (heading.level === 2 ? 'font-weight: 500;' : '')"
                                                 x-text="heading.text"
+                                                :title="heading.text"
                                             ></span>
                                         </button>
                                     </template>
@@ -1752,6 +1907,7 @@
                                     <p class="text-xs mt-1" style="color: var(--text-tertiary);" x-text="t('syntax_highlight.description')"></p>
                                 </div>
                                 
+<<<<<<< HEAD
                                 <!-- Auto Dark Mode -->
                                 <div class="mb-4">
                                     <label class="block text-xs font-medium mb-2" style="color: var(--text-secondary);" x-text="t('theme.auto_dark_mode')"></label>
@@ -1903,6 +2059,42 @@
                                         >
                                         </button>
                                     </div>
+=======
+                                <!-- Readable Line Length Toggle -->
+                                <div class="mb-4">
+                                    <label class="flex items-center justify-between cursor-pointer">
+                                        <span class="text-xs font-medium" style="color: var(--text-secondary);" x-text="t('settings.readable_line_length')"></span>
+                                        <div 
+                                            @click="toggleReadableLineLength()"
+                                            class="relative w-10 h-5 rounded-full transition-colors cursor-pointer"
+                                            :style="readableLineLength ? 'background-color: var(--accent-primary)' : 'background-color: var(--bg-tertiary)'"
+                                        >
+                                            <div 
+                                                class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform"
+                                                :style="'background-color: var(--bg-primary);' + (readableLineLength ? ' transform: translateX(20px);' : '')"
+                                            ></div>
+                                        </div>
+                                    </label>
+                                    <p class="text-xs mt-1" style="color: var(--text-tertiary);" x-text="t('settings.readable_line_length_desc')"></p>
+                                </div>
+                                
+                                <!-- Hide Underscore Folders Toggle -->
+                                <div class="mb-4">
+                                    <label class="flex items-center justify-between cursor-pointer">
+                                        <span class="text-xs font-medium" style="color: var(--text-secondary);" x-text="t('settings.hide_underscore_folders')"></span>
+                                        <div 
+                                            @click="toggleHideUnderscoreFolders()"
+                                            class="relative w-10 h-5 rounded-full transition-colors cursor-pointer"
+                                            :style="hideUnderscoreFolders ? 'background-color: var(--accent-primary)' : 'background-color: var(--bg-tertiary)'"
+                                        >
+                                            <div 
+                                                class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform"
+                                                :style="'background-color: var(--bg-primary);' + (hideUnderscoreFolders ? ' transform: translateX(20px);' : '')"
+                                            ></div>
+                                        </div>
+                                    </label>
+                                    <p class="text-xs mt-1" style="color: var(--text-tertiary);" x-text="t('settings.hide_underscore_folders_desc')"></p>
+>>>>>>> f5147ccc14a9d122541847a272c1b5d1b5fbb534
                                 </div>
                                 
                                 <!-- Logout (if auth enabled) - uses authEnabled from main app state -->
@@ -1936,9 +2128,9 @@
                     >
                                     notediscovery.com
                     </a>
-                    <!-- Ko-fi support link (demo mode only) -->
-                    <template x-if="demoMode">
-                        <div class="mt-3">
+                    <!-- Ko-fi support link (hidden if ALREADY_DONATED=true) -->
+                    <template x-if="!alreadyDonated">
+                        <div class="mt-3 flex flex-col gap-2 items-center">
                             <a 
                                 href="https://ko-fi.com/gamosoft" 
                                 target="_blank" 
@@ -1949,6 +2141,31 @@
                                 <span>☕</span>
                                 <span x-text="t('support.enjoying_demo')"></span>
                             </a>
+                            <!-- PikaPods deploy button -->
+                            <a 
+                                href="https://www.pikapods.com/pods?run=notediscovery" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                class="inline-flex items-center transition-all hover:scale-105"
+                            >
+                                <img src="https://www.pikapods.com/static/run-button.svg" alt="Run on PikaPods" style="height: 28px;">
+                            </a>
+                            <!-- Link to hide these buttons -->
+                            <a 
+                                href="https://github.com/gamosoft/NoteDiscovery/blob/main/documentation/ENVIRONMENT_VARIABLES.md#support" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                class="text-[10px] opacity-50 hover:opacity-100 transition-opacity"
+                                style="color: var(--text-tertiary);"
+                            >
+                                hide these buttons
+                            </a>
+                        </div>
+                    </template>
+                    <!-- Thank you message (shown when ALREADY_DONATED=true) -->
+                    <template x-if="alreadyDonated">
+                        <div class="mt-3 text-[10px] opacity-50 hover:opacity-100 transition-opacity text-center" style="color: var(--text-tertiary);">
+                            <span x-text="t('support.thank_you')"></span>
                         </div>
                     </template>
                 </div>
@@ -2002,7 +2219,7 @@
                 </button>
             </div>
             
-            <template x-if="!currentNote && !currentImage">
+            <template x-if="!currentNote && !currentMedia">
                 <!-- Notes Homepage -->
                 <div class="flex-1 overflow-y-auto custom-scrollbar" style="background-color: var(--bg-primary);">
                     <!-- Mobile Menu Button (Homepage) -->
@@ -2049,11 +2266,11 @@
                                 <h1 class="text-3xl font-bold mb-2" style="color: var(--text-primary);" x-text="appName"></h1>
                                 <p class="text-lg" style="color: var(--text-secondary);" x-text="t('app.tagline')"></p>
                                 <!-- Demo Mode Warning Banner -->
-                                <div x-data="{ showDemoBanner: false }" x-init="fetch('/api/config').then(r => r.json()).then(d => showDemoBanner = d.demoMode || false)" x-show="showDemoBanner" class="mt-4 flex items-center px-4 py-2.5 text-sm rounded-lg" style="background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%); color: white; font-weight: 500;">
+                                <div x-show="demoMode" class="mt-4 flex items-center px-4 py-2.5 text-sm rounded-lg" style="background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%); color: white; font-weight: 500;">
                                     <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                                     </svg>
-                                    <span><strong>DEMO MODE:</strong> Contents reset daily. Changes may be overwritten by other users.</span>
+                                    <span><strong x-text="t('demo.title') + ':'"></strong> <span x-text="t('demo.warning')"></span></span>
                                 </div>
                             </div>
                             
@@ -2125,20 +2342,20 @@
                             
                             <!-- Folders and Notes Grid -->
                             <template x-if="homepageNotes().length > 0 || homepageFolders().length > 0">
-                                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4">
                                     <!-- Folders First -->
                                     <template x-for="folder in homepageFolders()" :key="folder.path">
                                         <div 
                                             @click="goToHomepageFolder(folder.path)"
-                                            class="p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-lg"
-                                            style="background-color: var(--bg-secondary); border-color: var(--accent-primary); min-height: 140px; display: flex; flex-direction: column; border-width: 2px; position: relative;"
+                                            class="homepage-card p-2 sm:p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-lg"
+                                            style="background-color: var(--bg-secondary); border-color: var(--accent-primary); display: flex; flex-direction: column; border-width: 2px; position: relative;"
                                             onmouseover="this.style.borderColor='var(--accent-hover)'; this.style.transform='translateY(-2px)'; this.querySelector('.card-delete-btn').style.opacity='1';"
                                             onmouseout="this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(0)'; this.querySelector('.card-delete-btn').style.opacity='0';"
                                         >
                                             <!-- Delete Button -->
                                             <button 
                                                 @click.stop="deleteFolder(folder.path, folder.name)"
-                                                class="card-delete-btn"
+                                                class="card-delete-btn hidden sm:block"
                                                 style="position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity 0.2s; color: var(--error); padding: 4px; border-radius: 4px; background-color: var(--bg-secondary);"
                                                 onmouseover="this.style.backgroundColor='var(--bg-hover)'"
                                                 onmouseout="this.style.backgroundColor='var(--bg-secondary)'"
@@ -2150,17 +2367,17 @@
                                             </button>
                                             
                                             <!-- Folder Icon -->
-                                            <div class="mb-2 flex items-center gap-2">
-                                                <svg class="w-6 h-6" style="color: var(--accent-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <div class="mb-1 sm:mb-2 flex items-center gap-1 sm:gap-2">
+                                                <svg class="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" style="color: var(--accent-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
                                                 </svg>
-                                                <h3 class="font-semibold text-base" style="color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical;" x-text="folder.name"></h3>
+                                                <h3 class="font-semibold text-sm sm:text-base" style="color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" x-text="folder.name"></h3>
                                             </div>
                                             
                                             <!-- Folder Metadata -->
-                                            <div class="flex items-center justify-between text-xs mt-auto pt-2" style="color: var(--text-tertiary);">
+                                            <div class="flex items-center justify-between text-xs mt-auto pt-1 sm:pt-2" style="color: var(--text-tertiary);">
                                                 <span x-text="folder.noteCount + ' ' + (folder.noteCount === 1 ? t('homepage.note_singular') : t('homepage.note_plural'))"></span>
-                                                <svg class="w-4 h-4" style="color: var(--accent-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg class="w-4 h-4 hidden sm:block" style="color: var(--accent-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                                                 </svg>
                                             </div>
@@ -2171,19 +2388,19 @@
                                     <template x-for="note in homepageNotes().slice(0, HOMEPAGE_MAX_NOTES)" :key="note.path">
                                         <div 
                                             @click="openItem(note.path, note.type)"
-                                            class="p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-lg"
-                                            style="background-color: var(--bg-secondary); border-color: var(--border-primary); min-height: 140px; display: flex; flex-direction: column; position: relative;"
+                                            class="homepage-card p-2 sm:p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-lg"
+                                            style="background-color: var(--bg-secondary); border-color: var(--border-primary); display: flex; flex-direction: column; position: relative;"
                                             onmouseover="this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(-2px)'; this.querySelector('.card-delete-btn').style.opacity='1';"
                                             onmouseout="this.style.borderColor='var(--border-primary)'; this.style.transform='translateY(0)'; this.querySelector('.card-delete-btn').style.opacity='0';"
                                         >
                                             <!-- Delete Button -->
                                             <button 
-                                                @click.stop="note.type === 'image' ? deleteImage(note.path) : deleteNote(note.path, note.name)"
-                                                class="card-delete-btn"
+                                                @click.stop="note.type !== 'note' ? deleteMedia(note.path) : deleteNote(note.path, note.name)"
+                                                class="card-delete-btn hidden sm:block"
                                                 style="position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity 0.2s; color: var(--error); padding: 4px; border-radius: 4px; background-color: var(--bg-secondary);"
                                                 onmouseover="this.style.backgroundColor='var(--bg-hover)'"
                                                 onmouseout="this.style.backgroundColor='var(--bg-secondary)'"
-                                                :title="note.type === 'image' ? t('toolbar.delete_image') : t('toolbar.delete_note')"
+                                                :title="note.type !== 'note' ? t('toolbar.delete_image') : t('toolbar.delete_note')"
                                             >
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -2191,12 +2408,12 @@
                                             </button>
                                             
                                             <!-- Note Title -->
-                                            <h3 class="font-semibold text-base mb-2" style="color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical;" x-text="note.name"></h3>
+                                            <h3 class="font-semibold text-sm sm:text-base mb-1 sm:mb-2" style="color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" x-text="note.name"></h3>
                                             
                                             <!-- Metadata -->
-                                            <div class="flex items-center justify-between text-xs mt-auto pt-2" style="color: var(--text-tertiary);">
+                                            <div class="flex items-center justify-between text-xs mt-auto pt-1 sm:pt-2" style="color: var(--text-tertiary);">
                                                 <span x-text="formatDate(note.modified)"></span>
-                                                <span x-text="formatSize(note.size)"></span>
+                                                <span class="hidden sm:inline" x-text="formatSize(note.size)"></span>
                                             </div>
                                         </div>
                                     </template>
@@ -2214,7 +2431,7 @@
                 </div>
             </template>
             
-            <template x-if="currentNote || currentImage">
+            <template x-if="currentNote || currentMedia">
                 <!-- Editor Area -->
                 <div class="flex-1 flex flex-col overflow-hidden" :class="{'zen-editor-container': zenMode}" style="background-color: var(--bg-primary);">
                     <!-- Toolbar -->
@@ -2235,7 +2452,7 @@
                             </button>
                             <input 
                                 type="text" 
-                                :value="currentNote ? currentNoteName : (currentImage ? currentImage.split('/').pop() : '')"
+                                :value="currentNote ? currentNoteName : (currentMedia ? currentMedia.split('/').pop() : '')"
                                 @input="if (currentNote) currentNoteName = $event.target.value"
                                 @blur="if (currentNote) renameNote()"
                                 :readonly="!currentNote"
@@ -2274,12 +2491,12 @@
                             
                             <!-- Delete Button -->
                             <button 
-                                @click="currentImage ? deleteImage(currentImage) : deleteCurrentNote()"
+                                @click="currentMedia ? deleteMedia(currentMedia) : deleteCurrentNote()"
                                 class="p-2 rounded-lg"
                                 style="color: var(--error);"
                                 onmouseover="this.style.backgroundColor='var(--bg-hover)'"
                                 onmouseout="this.style.backgroundColor='transparent'"
-                                :title="currentImage ? t('toolbar.delete_image') : t('toolbar.delete_note')"
+                                :title="currentMedia ? t('toolbar.delete_image') : t('toolbar.delete_note')"
                             >
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -2291,11 +2508,11 @@
                         </div>
                         
                         <!-- Demo Mode Warning Banner -->
-                        <div x-data="{ showDemoBanner: false }" x-init="fetch('/api/config').then(r => r.json()).then(d => showDemoBanner = d.demoMode || false)" x-show="showDemoBanner" class="flex items-center px-3 py-1.5 text-xs rounded-lg" style="background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%); color: white; font-weight: 500;">
+                        <div x-show="demoMode" class="flex items-center px-3 py-1.5 text-xs rounded-lg" style="background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%); color: white; font-weight: 500;">
                             <svg class="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                             </svg>
-                            <span><strong>DEMO MODE:</strong> Contents reset daily. Changes may be overwritten by other users.</span>
+                            <span><strong x-text="t('demo.title') + ':'"></strong> <span x-text="t('demo.warning')"></span></span>
                         </div>
                         
                         <div class="flex items-center space-x-2" x-show="currentNote">
@@ -2385,6 +2602,21 @@
                                     </svg>
                                 </button>
                                 <div style="width: 1px; height: 20px; background-color: var(--border-primary);"></div>
+                                <!-- Share button -->
+                                <button 
+                                    @click="openShareModal()"
+                                    class="p-2 transition hover:bg-opacity-80"
+                                    :title="t('share.button_tooltip')"
+                                    style="color: var(--text-secondary);"
+                                    @mouseenter="$el.style.backgroundColor = 'var(--bg-secondary)'"
+                                    @mouseleave="$el.style.backgroundColor = 'transparent'"
+                                >
+                                    <!-- Share/Globe icon -->
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
+                                    </svg>
+                                </button>
+                                <div style="width: 1px; height: 20px; background-color: var(--border-primary);"></div>
                                 <button 
                                     @click="toggleZenMode()"
                                     class="p-2 transition"
@@ -2406,7 +2638,7 @@
                     <div class="flex-1 flex relative" style="min-height: 0;">
                         <!-- Editor -->
                         <div 
-                            x-show="!currentImage && (viewMode === 'edit' || viewMode === 'split')"
+                            x-show="!currentMedia && (viewMode === 'edit' || viewMode === 'split')"
                             class="flex flex-col"
                             style="min-height: 0;"
                             :style="viewMode === 'split' ? `width: ${editorWidth}%;` : 'width: 100%;'"
@@ -2485,7 +2717,7 @@
                         
                         <!-- Split view resize handle -->
                         <div 
-                            x-show="!currentImage && viewMode === 'split'"
+                            x-show="!currentMedia && viewMode === 'split'"
                             @mousedown="startSplitResize($event)"
                             class="split-resize-handle"
                             style="width: 6px; cursor: col-resize; background: linear-gradient(90deg, transparent 0%, var(--border-secondary) 50%, transparent 100%); transition: all 0.2s; position: relative; z-index: 10; opacity: 0.5;"
@@ -2495,7 +2727,7 @@
                         
                         <!-- Preview -->
                         <div 
-                            x-show="(viewMode === 'preview' || viewMode === 'split') && !currentImage"
+                            x-show="(viewMode === 'preview' || viewMode === 'split') && !currentMedia"
                             class="overflow-y-auto overflow-x-hidden custom-scrollbar"
                             style="background-color: var(--bg-primary); min-height: 0;"
                             :style="viewMode === 'split' ? `width: ${100 - editorWidth}%;` : 'width: 100%;'"
@@ -2612,23 +2844,61 @@
                             
                             <div 
                                 class="p-6 markdown-preview"
-                                :class="{ 'pt-2': getHasMetadata() && currentNote }"
+                                :class="{ 'pt-2': getHasMetadata() && currentNote, 'readable-width': readableLineLength }"
                                 x-html="renderedMarkdown"
                                 @click="handleInternalLink($event)"
                             ></div>
                         </div>
                         
-                        <!-- Image Viewer -->
-                        <template x-if="currentImage">
+                        <!-- Media Viewer (images, audio, video, PDF) -->
+                        <template x-if="currentMedia">
                             <div 
                                 class="flex-1 flex items-center justify-center overflow-auto"
                                 style="background-color: var(--bg-primary); min-height: 0;"
                             >
-                                <img 
-                                    :src="`/api/images/${currentImage}`" 
-                                    :alt="currentImage.split('/').pop()"
-                                    style="max-width: 100%; max-height: 100%; object-fit: contain; padding: 2rem;"
-                                />
+                                <!-- Image -->
+                                <template x-if="currentMediaType === 'image'">
+                                    <img 
+                                        :src="`/api/media/${currentMedia}`" 
+                                        :alt="currentMedia.split('/').pop()"
+                                        style="max-width: 100%; max-height: 100%; object-fit: contain; padding: 2rem;"
+                                    />
+                                </template>
+                                
+                                <!-- Audio -->
+                                <template x-if="currentMediaType === 'audio'">
+                                    <div class="flex flex-col items-center gap-4 p-8">
+                                        <div class="text-6xl">🎵</div>
+                                        <div class="text-lg font-medium" style="color: var(--text-primary);" x-text="currentMedia.split('/').pop()"></div>
+                                        <audio 
+                                            controls 
+                                            :src="`/api/media/${currentMedia}`"
+                                            style="width: 100%; max-width: 500px;"
+                                        >
+                                            Your browser does not support the audio element.
+                                        </audio>
+                                    </div>
+                                </template>
+                                
+                                <!-- Video -->
+                                <template x-if="currentMediaType === 'video'">
+                                    <video 
+                                        controls 
+                                        :src="`/api/media/${currentMedia}`"
+                                        style="max-width: 100%; max-height: 100%; padding: 1rem;"
+                                    >
+                                        Your browser does not support the video element.
+                                    </video>
+                                </template>
+                                
+                                <!-- PDF -->
+                                <template x-if="currentMediaType === 'document'">
+                                    <iframe 
+                                        :src="`/api/media/${currentMedia}`"
+                                        style="width: 100%; height: 100%; border: none;"
+                                        :title="currentMedia.split('/').pop()"
+                                    ></iframe>
+                                </template>
                             </div>
                         </template>
                     </div>
@@ -2912,22 +3182,217 @@
         </div>
     </div>
     
+    <!-- Quick Switcher Modal (Ctrl+K) -->
+    <div x-show="showQuickSwitcher" 
+         @click.self="closeQuickSwitcher()"
+         @keydown.escape.window="showQuickSwitcher && closeQuickSwitcher()"
+         x-effect="if (showQuickSwitcher) { quickSwitcherResults = filterQuickSwitcher(quickSwitcherQuery); quickSwitcherIndex = 0; }"
+         class="fixed inset-0 flex items-start justify-center pt-24"
+         style="background-color: rgba(0, 0, 0, 0.5); z-index: 1200;"
+         x-cloak>
+        <div class="rounded-lg shadow-2xl w-full max-w-lg mx-4 overflow-hidden"
+             style="background-color: var(--bg-primary); border: 1px solid var(--border-primary);"
+             @click.stop>
+            
+            <!-- Search Input -->
+            <div class="p-3 border-b" style="border-color: var(--border-primary);">
+                <input id="quickSwitcherInput"
+                       type="text"
+                       x-model="quickSwitcherQuery"
+                       @keydown="handleQuickSwitcherKeydown($event)"
+                       :placeholder="t('quick_switcher.placeholder')"
+                       class="w-full px-3 py-2 rounded text-base outline-none"
+                       style="background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary);"
+                       autocomplete="off">
+            </div>
+            
+            <!-- Results List -->
+            <div id="quickSwitcherResults" class="max-h-80 overflow-y-auto">
+                <template x-if="quickSwitcherResults.length === 0">
+                    <div class="p-4 text-center text-sm" style="color: var(--text-secondary);">
+                        <span x-text="t('quick_switcher.no_results')"></span>
+                    </div>
+                </template>
+                <template x-for="(note, index) in quickSwitcherResults" :key="note.path">
+                    <div @click="selectQuickSwitcherNote(note)"
+                         data-quick-switcher-item
+                         :class="index === quickSwitcherIndex ? 'quick-switcher-selected' : ''"
+                         class="px-4 py-3 cursor-pointer flex items-center gap-3 transition-colors"
+                         :style="index === quickSwitcherIndex ? 'background-color: var(--bg-tertiary);' : ''"
+                         @mouseenter="quickSwitcherIndex = index">
+                        <!-- Note icon -->
+                        <svg class="w-4 h-4 flex-shrink-0" style="color: var(--text-secondary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-medium truncate" style="color: var(--text-primary);" x-text="note.name" :title="note.name"></div>
+                            <div class="text-xs truncate" style="color: var(--text-secondary);" x-show="note.folder" x-text="note.folder" :title="note.folder"></div>
+                        </div>
+                    </div>
+                </template>
+                
+                <!-- Recent notes hint (only when no query typed) -->
+                <div x-show="!quickSwitcherQuery.trim() && quickSwitcherResults.length > 0" 
+                     class="px-4 py-2 text-xs text-center italic"
+                     style="color: var(--text-secondary);">
+                    <span x-text="t('quick_switcher.recent_hint')"></span>
+                </div>
+            </div>
+            
+            <!-- Footer hint -->
+            <div class="px-4 py-2 text-xs border-t flex gap-4" style="border-color: var(--border-primary); color: var(--text-secondary); background-color: var(--bg-secondary);">
+                <span>↑↓ <span x-text="t('quick_switcher.navigate')"></span></span>
+                <span>↵ <span x-text="t('quick_switcher.open')"></span></span>
+                <span>esc <span x-text="t('quick_switcher.close')"></span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div x-show="showShareModal" 
+         @click.self="closeShareModal()"
+         @keydown.escape.window="showShareModal && closeShareModal()"
+         class="fixed inset-0 flex items-center justify-center"
+         style="background-color: rgba(0, 0, 0, 0.5); z-index: 1100;"
+         x-cloak>
+        <div class="rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
+             style="background-color: var(--bg-secondary); color: var(--text-primary);"
+             @click.stop>
+            
+            <h2 class="text-xl font-bold mb-4 flex items-center gap-2" style="color: var(--text-primary);">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
+                </svg>
+                <span x-text="t('share.modal_title')"></span>
+            </h2>
+            
+            <!-- Loading state -->
+            <div x-show="shareLoading" class="text-center py-4">
+                <span x-text="t('common.loading')"></span>
+            </div>
+            
+            <!-- Not shared state -->
+            <div x-show="!shareLoading && !shareInfo?.shared">
+                <p class="mb-4 text-sm" style="color: var(--text-secondary);" x-text="t('share.not_shared_description')"></p>
+                <button 
+                    @click="createShareLink()"
+                    class="w-full px-4 py-2 rounded font-medium text-white transition-colors"
+                    style="background-color: var(--accent-primary);"
+                    onmouseover="this.style.backgroundColor='var(--accent-hover)'"
+                    onmouseout="this.style.backgroundColor='var(--accent-primary)'"
+                    x-text="t('share.create_link')"
+                >
+                </button>
+            </div>
+            
+            <!-- Shared state -->
+            <div x-show="!shareLoading && shareInfo?.shared">
+                <p class="mb-2 text-sm" style="color: var(--text-secondary);" x-text="t('share.shared_description')"></p>
+                
+                <!-- Share URL -->
+                <div class="flex gap-2 mb-4">
+                    <input 
+                        type="text"
+                        :value="shareInfo?.url || ''"
+                        readonly
+                        class="flex-1 px-3 py-2 rounded border text-sm"
+                        style="background-color: var(--bg-tertiary); color: var(--text-primary); border-color: var(--border-primary);"
+                        @click="$el.select()"
+                    />
+                    <button 
+                        @click="copyShareLink()"
+                        class="px-3 py-2 rounded font-medium text-white transition-colors flex items-center gap-1"
+                        :style="shareLinkCopied ? 'background-color: var(--success, #22c55e);' : 'background-color: var(--accent-primary);'"
+                        onmouseover="if(!this.classList.contains('copied')) this.style.backgroundColor='var(--accent-hover)'"
+                        onmouseout="if(!this.classList.contains('copied')) this.style.backgroundColor='var(--accent-primary)'"
+                    >
+                        <svg x-show="!shareLinkCopied" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+                        </svg>
+                        <svg x-show="shareLinkCopied" x-cloak class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span x-text="shareLinkCopied ? t('common.copied') : t('share.copy')"></span>
+                    </button>
+                </div>
+                
+                <!-- QR Code -->
+                <div class="mb-4 flex flex-col items-center">
+                    <button 
+                        @click="showShareQR = !showShareQR"
+                        class="text-sm flex items-center gap-1 mb-2 transition-colors"
+                        style="color: var(--text-secondary);"
+                        onmouseover="this.style.color='var(--text-primary)'"
+                        onmouseout="this.style.color='var(--text-secondary)'"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+                        </svg>
+                        <span x-text="showShareQR ? t('share.hide_qr') : t('share.show_qr')"></span>
+                        <svg class="w-3 h-3 transition-transform" :class="showShareQR ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div x-show="showShareQR" 
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 transform scale-95"
+                         x-transition:enter-end="opacity-100 transform scale-100"
+                         x-transition:leave="transition ease-in duration-150"
+                         x-transition:leave-start="opacity-100 transform scale-100"
+                         x-transition:leave-end="opacity-0 transform scale-95"
+                         class="p-3 rounded-lg" 
+                         style="background-color: white;">
+                        <img :src="generateQRCode(shareInfo?.url)" alt="QR Code" class="w-32 h-32" />
+                    </div>
+                </div>
+                
+                <!-- Revoke sharing -->
+                <button 
+                    @click="revokeShareLink()"
+                    class="w-full px-4 py-2 rounded font-medium transition-colors"
+                    style="background-color: transparent; color: var(--error); border: 1px solid var(--error);"
+                    onmouseover="this.style.backgroundColor='rgba(239, 68, 68, 0.1)'"
+                    onmouseout="this.style.backgroundColor='transparent'"
+                    x-text="t('share.stop_sharing')"
+                >
+                </button>
+            </div>
+            
+            <!-- Close button -->
+            <div class="mt-4 pt-4 border-t" style="border-color: var(--border-primary);">
+                <button 
+                    @click="closeShareModal()"
+                    class="w-full px-4 py-2 rounded font-medium transition-colors"
+                    style="background-color: var(--bg-tertiary); color: var(--text-primary);"
+                    onmouseover="this.style.backgroundColor='var(--bg-hover)'"
+                    onmouseout="this.style.backgroundColor='var(--bg-tertiary)'"
+                    x-text="t('common.close')"
+                >
+                </button>
+            </div>
+        </div>
+    </div>
+    
     <!-- Mobile Bottom Tabs -->
     <nav class="mobile-bottom-tabs zen-hide" style="display: none;" role="navigation" aria-label="Main navigation">
         <button 
             class="mobile-bottom-tab"
-            :class="{'active': activePanel === 'files'}"
-            @click="activePanel = 'files'; mobileSidebarOpen = true;"
+            :class="{'active': activePanel === 'files' && (mobileSidebarOpen || (!currentNote && !currentMedia && !showGraph))}"
+            @click="mobileFilesTabClick()"
             :aria-label="t('sidebar.files')"
         >
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <!-- Show home icon when viewing content, folder icon when on homepage -->
+            <svg x-show="currentNote || currentMedia || showGraph" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+            </svg>
+            <svg x-show="!currentNote && !currentMedia && !showGraph" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
             </svg>
-            <span x-text="t('sidebar.files')"></span>
+            <span x-text="(currentNote || currentMedia || showGraph) ? t('homepage.title') : t('sidebar.files')"></span>
         </button>
         <button 
             class="mobile-bottom-tab relative"
-            :class="{'active': activePanel === 'search'}"
+            :class="{'active': activePanel === 'search' && mobileSidebarOpen}"
             @click="activePanel = 'search'; mobileSidebarOpen = true;"
             :aria-label="t('sidebar.search')"
         >
@@ -2946,7 +3411,7 @@
         </button>
         <button 
             class="mobile-bottom-tab relative"
-            :class="{'active': activePanel === 'tags'}"
+            :class="{'active': activePanel === 'tags' && mobileSidebarOpen}"
             @click="activePanel = 'tags'; mobileSidebarOpen = true;"
             :aria-label="t('tags.title')"
         >
@@ -2976,7 +3441,7 @@
         </button>
         <button 
             class="mobile-bottom-tab"
-            :class="{'active': activePanel === 'settings'}"
+            :class="{'active': activePanel === 'settings' && mobileSidebarOpen}"
             @click="activePanel = 'settings'; mobileSidebarOpen = true;"
             :aria-label="t('sidebar.settings')"
         >

@@ -3,12 +3,30 @@
 // Configuration constants
 const CONFIG = {
     AUTOSAVE_DELAY: 1000,              // ms - Delay before triggering autosave
+    SEARCH_DEBOUNCE_DELAY: 500,        // ms - Delay before running note search while typing
     SAVE_INDICATOR_DURATION: 2000,     // ms - How long to show "saved" indicator
     SCROLL_SYNC_DELAY: 50,             // ms - Delay to prevent scroll sync interference
     SCROLL_SYNC_MAX_RETRIES: 10,       // Maximum attempts to find editor/preview elements
     SCROLL_SYNC_RETRY_INTERVAL: 100,   // ms - Time between setupScrollSync retries
     MAX_UNDO_HISTORY: 50,              // Maximum number of undo steps to keep
     DEFAULT_SIDEBAR_WIDTH: 256,        // px - Default sidebar width (w-64 in Tailwind)
+};
+
+// localStorage settings configuration - centralized definition of all persisted settings
+const LOCAL_SETTINGS = {
+    // Boolean settings
+    syntaxHighlightEnabled: { key: 'syntaxHighlightEnabled', type: 'boolean', default: false },
+    readableLineLength: { key: 'readableLineLength', type: 'boolean', default: true },
+    favoritesExpanded: { key: 'favoritesExpanded', type: 'boolean', default: true },
+    tagsExpanded: { key: 'tagsExpanded', type: 'boolean', default: false },
+    hideUnderscoreFolders: { key: 'hideUnderscoreFolders', type: 'boolean', default: false },
+    // Number settings with validation
+    sidebarWidth: { key: 'sidebarWidth', type: 'number', default: CONFIG.DEFAULT_SIDEBAR_WIDTH, min: 200, max: 600 },
+    editorWidth: { key: 'editorWidth', type: 'number', default: 50, min: 20, max: 80 },
+    // String settings with validation
+    viewMode: { key: 'viewMode', type: 'string', default: 'split', valid: ['edit', 'split', 'preview'] },
+    // JSON settings
+    favorites: { key: 'noteFavorites', type: 'json', default: [] },
 };
 
 // Centralized error handling
@@ -129,6 +147,7 @@ function noteApp() {
         appVersion: '0.0.0',
         authEnabled: false,
         demoMode: false,
+        alreadyDonated: false,
         notes: [],
         currentNote: '',
         currentNoteName: '',
@@ -163,6 +182,10 @@ function noteApp() {
             byNameLower: new Map(),      // name.toLowerCase() -> true
             byEndPath: new Map(),        // '/filename' and '/filename.md' -> true
         },
+        
+        // Media lookup map for O(1) media wikilink resolution (built on loadNotes)
+        // Maps media filename (case-insensitive) -> full path
+        _mediaLookup: new Map(),
         
         // Preview rendering debounce
         _previewDebounceTimeout: null,
@@ -215,6 +238,13 @@ function noteApp() {
         syntaxHighlightEnabled: false,
         syntaxHighlightTimeout: null,
         
+        // Readable line length (preview max-width)
+        readableLineLength: true,
+        
+        // Hide underscore-prefixed folders (_attachments, _templates) from sidebar
+        // Read synchronously to prevent flash on initial render
+        hideUnderscoreFolders: localStorage.getItem('hideUnderscoreFolders') === 'true',
+        
         // Icon rail / panel state
         activePanel: 'files', // 'files', 'search', 'tags', 'settings'
         
@@ -222,8 +252,6 @@ function noteApp() {
         folderTree: [],
         allFolders: [],
         expandedFolders: new Set(),
-        draggedNote: null,
-        draggedFolder: null,
         dragOverFolder: null,  // Track which folder is being hovered during drag
         
         // Tags state
@@ -231,6 +259,10 @@ function noteApp() {
         selectedTags: [],
         tagsExpanded: false,
         tagReloadTimeout: null, // For debouncing tag reloads
+
+        // Search state
+        searchDebounceTimeout: null,
+        isSearching: false,
         
         // Outline (TOC) state
         outline: [], // [{level: 1, text: 'Heading', slug: 'heading'}, ...]
@@ -238,8 +270,8 @@ function noteApp() {
         // Scroll sync state
         isScrolling: false,
         
-        // Unified drag state
-        draggedItem: null,  // { path: string, type: 'note' | 'image' }
+        // Unified drag state for notes, folders, and media
+        draggedItem: null,  // { path: string, type: 'note' | 'folder' | 'image' | 'audio' | 'video' | 'document' }
         dropTarget: null,   // 'editor' | 'folder' | null
         
         // Undo/Redo history
@@ -280,6 +312,20 @@ function noteApp() {
         availableTemplates: [],
         selectedTemplate: '',
         newTemplateNoteName: '',
+        
+        // Share state
+        showShareModal: false,
+        shareInfo: null,
+        shareLoading: false,
+        showShareQR: false,
+        shareLinkCopied: false,
+        _sharedNotePaths: new Set(),  // O(1) lookup for shared note indicators
+        
+        // Quick Switcher state (Ctrl+Alt+P)
+        showQuickSwitcher: false,
+        quickSwitcherQuery: '',
+        quickSwitcherIndex: 0,
+        quickSwitcherResults: [],
         
         // Homepage state
         selectedHomepageFolder: '',
@@ -435,8 +481,9 @@ function noteApp() {
         // Mermaid state cache
         lastMermaidTheme: null,
         
-        // Image viewer state
-        currentImage: '',
+        // Media viewer state
+        currentMedia: '',  // Path to current media file (kept as 'currentMedia' for compatibility)
+        currentMediaType: 'image',  // 'image', 'audio', 'video', 'document'
         
         // DOM element cache (to avoid repeated querySelector calls)
         _domCache: {
@@ -456,7 +503,7 @@ function noteApp() {
             
             // ESC key to cancel drag operations
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && (this.draggedNote || this.draggedFolder || this.draggedItem)) {
+                if (e.key === 'Escape' && this.draggedItem) {
                     this.cancelDrag();
                 }
             });
@@ -469,8 +516,10 @@ function noteApp() {
             // Note: Translations are preloaded synchronously before Alpine init (see index.html)
             // loadLocale() is only called when user changes language from settings
             await this.loadNotes();
+            await this.loadSharedNotePaths();
             await this.loadTemplates();
             await this.checkStatsPlugin();
+<<<<<<< HEAD
             this.loadSidebarWidth();
             this.loadEditorWidth();
             this.loadViewMode();
@@ -480,13 +529,17 @@ function noteApp() {
             this.loadSyntaxHighlightSetting();
             this.loadAutoDarkModeSettings();
             this.loadKeyboardShortcuts();
+=======
+            this.loadLocalSettings();
+>>>>>>> f5147ccc14a9d122541847a272c1b5d1b5fbb534
             
             // Parse URL and load specific note if provided
-            this.loadNoteFromURL();
+            this.loadItemFromURL();
             
             // Set initial homepage state ONLY if we're actually on the homepage
             if (window.location.pathname === '/') {
                 window.history.replaceState({ homepageFolder: '' }, '', '/');
+                document.title = this.appName;
             }
             
             // Listen for browser back/forward navigation
@@ -505,13 +558,17 @@ function noteApp() {
                         this.searchResults = [];
                         this.clearSearchHighlights();
                     }
+                } else if (e.state && e.state.mediaPath) {
+                    // Navigating to a media file
+                    this.viewMedia(e.state.mediaPath, null, false);
                 } else {
                     // Navigating back to homepage
                     this.currentNote = '';
                     this.noteContent = '';
                     this.currentNoteName = '';
                     this.outline = [];
-                    document.title = 'NoteDiscovery';
+                    this.shareInfo = null; // Reset share info
+                    document.title = this.appName;
                     
                     // Restore homepage folder state if it was saved
                     if (e.state && e.state.homepageFolder !== undefined) {
@@ -580,6 +637,7 @@ function noteApp() {
             if (!window.__noteapp_shortcuts_initialized) {
                 window.__noteapp_shortcuts_initialized = true;
                 window.addEventListener('keydown', (e) => {
+<<<<<<< HEAD
                     // Skip if custom shortcuts are disabled
                     if (!this.keyboardShortcuts.enabled) {
                         // Use default shortcuts
@@ -613,6 +671,54 @@ function noteApp() {
                     }
                     // F3 for next search match (not configurable)
                     else if (e.code === 'F3' && !e.shiftKey) {
+=======
+                    // Use e.key (not e.code) for letter keys to support non-QWERTY keyboard layouts
+                    
+                    // Ctrl/Cmd + S to save
+                    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                        e.preventDefault();
+                        this.saveNote();
+                    }
+                    
+                    // Ctrl/Cmd + Alt + P for Quick Switcher
+                    if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 'p') {
+                        e.preventDefault();
+                        this.openQuickSwitcher();
+                        return;
+                    }
+                    
+                    // Ctrl/Cmd + Alt/Option + N for new note
+                    if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 'n') {
+                        e.preventDefault();
+                        this.createNote();
+                    }
+                    
+                    // Ctrl/Cmd + Alt/Option + F for new folder
+                    if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 'f') {
+                        e.preventDefault();
+                        this.createFolder();
+                    }
+                    
+                    // Ctrl/Cmd + Z for undo (without shift or alt)
+                    // Use e.key instead of e.code to support non-QWERTY keyboard layouts
+                    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z') {
+                        e.preventDefault();
+                        this.undo();
+                    }
+                    
+                    // Ctrl/Cmd + Y OR Ctrl/Cmd+Shift+Z for redo
+                    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+                        e.preventDefault();
+                        this.redo();
+                    }
+                    if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z') {
+                        e.preventDefault();
+                        this.redo();
+                    }
+                    
+                    // F3 for next search match
+                    if (e.code === 'F3' && !e.shiftKey) {
+>>>>>>> f5147ccc14a9d122541847a272c1b5d1b5fbb534
                         e.preventDefault();
                         this.nextMatch();
                     }
@@ -625,6 +731,7 @@ function noteApp() {
                     // Only apply markdown shortcuts when editor is focused and a note is open
                     const isEditorFocused = document.activeElement?.id === 'note-editor';
                     if (isEditorFocused && this.currentNote) {
+<<<<<<< HEAD
                         if (this.matchesShortcut(e, shortcuts.bold)) {
                             e.preventDefault();
                             this.wrapSelection('**', '**', 'bold text');
@@ -642,6 +749,34 @@ function noteApp() {
                             this.insertTable();
                         }
                         else if (this.matchesShortcut(e, shortcuts.zen_mode)) {
+=======
+                        // Ctrl/Cmd + B for bold
+                        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+                            e.preventDefault();
+                            this.wrapSelection('**', '**', 'bold text');
+                        }
+                        
+                        // Ctrl/Cmd + I for italic
+                        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+                            e.preventDefault();
+                            this.wrapSelection('*', '*', 'italic text');
+                        }
+                        
+                        // Ctrl/Cmd + K for link
+                        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                            e.preventDefault();
+                            this.insertLink();
+                        }
+                        
+                        // Ctrl/Cmd + Alt/Option + T for table
+                        if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 't') {
+                            e.preventDefault();
+                            this.insertTable();
+                        }
+                        
+                        // Ctrl/Cmd + Alt/Option + Z for Zen mode
+                        if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 'z') {
+>>>>>>> f5147ccc14a9d122541847a272c1b5d1b5fbb534
                             e.preventDefault();
                             this.toggleZenMode();
                         }
@@ -690,6 +825,7 @@ function noteApp() {
                 this.appVersion = config.version || '0.0.0';
                 this.authEnabled = config.authentication?.enabled || false;
                 this.demoMode = config.demoMode || false;
+                this.alreadyDonated = config.alreadyDonated || false;
             } catch (error) {
                 console.error('Failed to load config:', error);
             }
@@ -1076,13 +1212,57 @@ function noteApp() {
             }
         },
         
-        loadSyntaxHighlightSetting() {
-            try {
-                const saved = localStorage.getItem('syntaxHighlightEnabled');
-                this.syntaxHighlightEnabled = saved === 'true';
-            } catch (error) {
-                console.error('Error loading syntax highlight setting:', error);
+        // Load all localStorage settings at once using centralized config
+        loadLocalSettings() {
+            for (const [prop, config] of Object.entries(LOCAL_SETTINGS)) {
+                try {
+                    const saved = localStorage.getItem(config.key);
+                    
+                    if (saved === null) {
+                        // Use default value if not set
+                        this[prop] = config.default;
+                    } else if (config.type === 'boolean') {
+                        this[prop] = saved === 'true';
+                    } else if (config.type === 'number') {
+                        const num = parseFloat(saved);
+                        // Validate range if specified
+                        if (!isNaN(num) && 
+                            (config.min === undefined || num >= config.min) && 
+                            (config.max === undefined || num <= config.max)) {
+                            this[prop] = num;
+                        } else {
+                            this[prop] = config.default;
+                        }
+                    } else if (config.type === 'string') {
+                        // Validate against allowed values if specified
+                        if (!config.valid || config.valid.includes(saved)) {
+                            this[prop] = saved;
+                        } else {
+                            this[prop] = config.default;
+                        }
+                    } else if (config.type === 'json') {
+                        this[prop] = JSON.parse(saved);
+                    }
+                } catch (error) {
+                    console.error(`Error loading setting ${prop}:`, error);
+                    this[prop] = config.default;
+                }
             }
+            
+            // Special case: favorites also needs to update the Set for O(1) lookups
+            this.favoritesSet = new Set(this.favorites);
+        },
+        
+        // Readable line length toggle (for preview max-width)
+        toggleReadableLineLength() {
+            this.readableLineLength = !this.readableLineLength;
+            localStorage.setItem('readableLineLength', this.readableLineLength);
+        },
+        
+        // Hide underscore folders toggle (hides _attachments, _templates, etc. from sidebar)
+        toggleHideUnderscoreFolders() {
+            this.hideUnderscoreFolders = !this.hideUnderscoreFolders;
+            localStorage.setItem('hideUnderscoreFolders', this.hideUnderscoreFolders);
         },
         
         // Update syntax highlight overlay (debounced, called on input)
@@ -1140,8 +1320,9 @@ function noteApp() {
             
             // Now apply other patterns (they won't match inside protected code)
             
-            // Headings
-            html = html.replace(/^(#{1,6})\s(.*)$/gm, '<span class="md-heading">$1 $2</span>');
+            // Headings - capture the whitespace to preserve exact characters (tabs vs spaces)
+            // This prevents cursor/selection misalignment
+            html = html.replace(/^(#{1,6})(\s)(.*)$/gm, '<span class="md-heading">$1$2$3</span>');
             
             // Bold (must come before italic)
             html = html.replace(/\*\*([^*]+)\*\*/g, '<span class="md-bold">**$1**</span>');
@@ -1157,9 +1338,15 @@ function noteApp() {
             // Links [text](url)
             html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<span class="md-link">[$1]</span><span class="md-link-url">($2)</span>');
             
-            // Lists
-            html = html.replace(/^(\s*)([-*+])\s/gm, '$1<span class="md-list">$2</span> ');
-            html = html.replace(/^(\s*)(\d+\.)\s/gm, '$1<span class="md-list">$2</span> ');
+            // Lists - use ([ \t]) to capture the space/tab and preserve exact characters
+            // IMPORTANT: Don't add any characters (like \u200B) that aren't in the original,
+            // as this breaks cursor/selection alignment between textarea and overlay
+            html = html.replace(/^(\s*)([-*+])([ \t])(.*)$/gm, (match, indent, bullet, space, rest) => {
+                return `${indent}<span class="md-list">${bullet}</span>${space}${rest}`;
+            });
+            html = html.replace(/^(\s*)(\d+\.)([ \t])(.*)$/gm, (match, indent, bullet, space, rest) => {
+                return `${indent}<span class="md-list">${bullet}</span>${space}${rest}`;
+            });
             
             // Blockquotes
             html = html.replace(/^(&gt;.*)$/gm, '<span class="md-blockquote">$1</span>');
@@ -1365,12 +1552,27 @@ function noteApp() {
             this._noteLookup.byName.clear();
             this._noteLookup.byNameLower.clear();
             this._noteLookup.byEndPath.clear();
+            this._mediaLookup.clear();
             
             for (const note of this.notes) {
                 const path = note.path;
                 const pathLower = path.toLowerCase();
                 const name = note.name;
                 const nameLower = name.toLowerCase();
+                
+                // Handle media files separately - build media lookup map
+                if (note.type !== 'note') {
+                    // Map filename WITH extension (case-insensitive) to full path
+                    // Use path to get filename with extension (note.name is stem without extension)
+                    const filenameWithExt = path.split('/').pop().toLowerCase();
+                    // First match wins if there are duplicates
+                    if (!this._mediaLookup.has(filenameWithExt)) {
+                        this._mediaLookup.set(filenameWithExt, path);
+                    }
+                    continue;
+                }
+                
+                // Notes only from here
                 const nameWithoutMd = name.replace(/\.md$/i, '');
                 const nameWithoutMdLower = nameWithoutMd.toLowerCase();
                 
@@ -1405,6 +1607,13 @@ function noteApp() {
                 this._noteLookup.byEndPath.has('/' + targetLower) ||
                 this._noteLookup.byEndPath.has('/' + targetLower + '.md')
             );
+        },
+        
+        // Resolve media wikilink to full path (O(1) lookup)
+        // Returns the full path if found, null otherwise
+        resolveMediaWikilink(mediaName) {
+            const nameLower = mediaName.toLowerCase();
+            return this._mediaLookup.get(nameLower) || null;
         },
         
         // Load all tags
@@ -1525,6 +1734,7 @@ function noteApp() {
                 // Reload notes and open the new note
                 await this.loadNotes();
                 await this.loadNote(data.path);
+                this.focusEditorForNewNote();
                 
             } catch (error) {
                 ErrorHandler.handle('create note from template', error);
@@ -1669,6 +1879,7 @@ function noteApp() {
             
             // Case 1: No filters at all → show full folder tree
             if (!hasTextSearch && !hasTagFilter) {
+                this.isSearching = false;
                 this.searchResults = [];
                 this.currentSearchHighlight = '';
                 this.clearSearchHighlights();
@@ -1678,6 +1889,7 @@ function noteApp() {
             
             // Case 2: Only tag filter → convert to flat list of matching notes
             if (hasTagFilter && !hasTextSearch) {
+                this.isSearching = false;
                 this.searchResults = this.notes.filter(note => 
                     note.type === 'note' && this.noteMatchesTags(note)
                 );
@@ -1688,6 +1900,7 @@ function noteApp() {
             
             // Case 3: Text search (with or without tag filter)
             if (hasTextSearch) {
+                this.isSearching = true;
                 try {
                     const response = await fetch(`/api/search?q=${encodeURIComponent(this.searchQuery)}`);
                     const data = await response.json();
@@ -1712,6 +1925,9 @@ function noteApp() {
                     }
                 } catch (error) {
                     console.error('Search failed:', error);
+                    this.searchResults = [];
+                } finally {
+                    this.isSearching = false;
                 }
             }
         },
@@ -1741,20 +1957,6 @@ function noteApp() {
         },
         
         // ==================== FAVORITES ====================
-        
-        // Load favorites from localStorage
-        loadFavorites() {
-            try {
-                const stored = localStorage.getItem('noteFavorites');
-                if (stored) {
-                    this.favorites = JSON.parse(stored);
-                    this.favoritesSet = new Set(this.favorites);
-                }
-            } catch (e) {
-                this.favorites = [];
-                this.favoritesSet = new Set();
-            }
-        },
         
         // Save favorites to localStorage
         saveFavorites() {
@@ -1804,17 +2006,6 @@ function noteApp() {
                     };
                 })
                 .filter(Boolean); // Remove nulls (deleted notes)
-        },
-        
-        loadFavoritesExpanded() {
-            try {
-                const saved = localStorage.getItem('favoritesExpanded');
-                if (saved !== null) {
-                    this.favoritesExpanded = saved === 'true';
-                }
-            } catch (e) {
-                console.error('Error loading favorites expanded state:', e);
-            }
         },
         
         saveFavoritesExpanded() {
@@ -2029,31 +2220,103 @@ function noteApp() {
             this.folderTree = tree;
         },
         
+        // =====================================================================
+        // DATA-ATTRIBUTE BASED HANDLERS
+        // These read path/name/type from data-* attributes, avoiding JS escaping issues
+        // =====================================================================
+        
+        // Escape strings for HTML attributes (simpler than JS escaping)
+        escapeHtmlAttr(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        },
+        
+        // Folder handlers - read from dataset
+        handleFolderClick(el) {
+            this.toggleFolder(el.dataset.path);
+        },
+        handleFolderDragOver(el, event) {
+            event.preventDefault();
+            this.dragOverFolder = el.dataset.path;
+            el.classList.add('drag-over');
+        },
+        handleFolderDragLeave(el) {
+            this.dragOverFolder = null;
+            el.classList.remove('drag-over');
+        },
+        handleFolderDrop(el, event) {
+            event.stopPropagation();
+            el.classList.remove('drag-over');
+            this.onFolderDrop(el.dataset.path);
+        },
+        handleNewItemClick(el, event) {
+            event.stopPropagation();
+            this.dropdownTargetFolder = el.dataset.path;
+            this.toggleNewDropdown(event);
+        },
+        handleRenameFolderClick(el, event) {
+            event.stopPropagation();
+            this.renameFolder(el.dataset.path, el.dataset.name);
+        },
+        handleDeleteFolderClick(el, event) {
+            event.stopPropagation();
+            this.deleteFolder(el.dataset.path, el.dataset.name);
+        },
+        
+        // Item (note/media) handlers - read from dataset
+        handleItemClick(el) {
+            this.openItem(el.dataset.path, el.dataset.type);
+        },
+        handleItemHover(el, isEnter) {
+            const path = el.dataset.path;
+            if (path !== this.currentNote && path !== this.currentMedia) {
+                el.style.backgroundColor = isEnter ? 'var(--bg-hover)' : 'transparent';
+            }
+        },
+        handleDeleteItemClick(el, event) {
+            event.stopPropagation();
+            if (el.dataset.type === 'image') {
+                this.deleteMedia(el.dataset.path);
+            } else {
+                this.deleteNote(el.dataset.path, el.dataset.name);
+            }
+        },
+        
+        // =====================================================================
+        // FOLDER TREE RENDERING
+        // =====================================================================
+        
         // Render folder recursively (helper for deep nesting)
+        // Uses data-* attributes to store path/name, avoiding JS string escaping issues
         renderFolderRecursive(folder, level = 0, isTopLevel = false) {
             if (!folder) return '';
             
             let html = '';
             const isExpanded = this.expandedFolders.has(folder.path);
+            const esc = (s) => this.escapeHtmlAttr(s); // Shorthand for HTML escaping
             
             // Render this folder's header
-            // Note: Using native event handlers (ondragstart, onclick, etc.) instead of Alpine directives
+            // Note: Using native event handlers with data-* attributes instead of Alpine directives
             // because x-html doesn't process Alpine directives in dynamically generated content
-            const escapedPath = folder.path.replace(/'/g, "\\'").replace(/\\/g, "\\\\");
             html += `
                 <div>
                     <div 
+                        data-path="${esc(folder.path)}"
+                        data-name="${esc(folder.name)}"
                         draggable="true"
-                        ondragstart="window.$root.onFolderDragStart('${escapedPath}', event)"
-                        ondragend="window.$root.onFolderDragEnd()"
-                        ondragover="event.preventDefault(); window.$root.dragOverFolder = '${escapedPath}'; this.classList.add('drag-over')"
-                        ondragenter="event.preventDefault(); window.$root.dragOverFolder = '${escapedPath}'; this.classList.add('drag-over')"
-                        ondragleave="window.$root.dragOverFolder = null; this.classList.remove('drag-over')"
-                        ondrop="event.stopPropagation(); this.classList.remove('drag-over'); window.$root.onFolderDrop('${escapedPath}')"
-                        onclick="window.$root.toggleFolder('${escapedPath}')"
-                        onmouseover="if(!window.$root.draggedNote && !window.$root.draggedFolder) this.style.backgroundColor='var(--bg-hover)'"
-                        onmouseout="if(!window.$root.draggedNote && !window.$root.draggedFolder) this.style.backgroundColor='transparent'"
-                        class="folder-item px-2 py-1 text-sm relative"
+                        ondragstart="window.$root.onItemDragStart(this.dataset.path, 'folder', event)"
+                        ondragend="window.$root.onItemDragEnd()"
+                        ondragover="window.$root.handleFolderDragOver(this, event)"
+                        ondragenter="window.$root.handleFolderDragOver(this, event)"
+                        ondragleave="window.$root.handleFolderDragLeave(this)"
+                        ondrop="window.$root.handleFolderDrop(this, event)"
+                        onclick="window.$root.handleFolderClick(this)"
+                        class="folder-item hover-accent px-2 py-1 text-sm relative"
                         style="color: var(--text-primary); cursor: pointer;"
                     >
                         <div class="flex items-center gap-1">
@@ -2065,26 +2328,31 @@ function noteApp() {
                                     <path d="M6 4l4 4-4 4V4z"/>
                                 </svg>
                             </button>
-                            <span class="flex items-center gap-1 flex-1" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; pointer-events: none;">
-                                <span>${folder.name}</span>
+                            <span class="flex items-center gap-1 flex-1" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; pointer-events: none;" title="${esc(folder.name)}">
+                                <span>${esc(folder.name)}</span>
                                 ${folder.notes.length === 0 && (!folder.children || Object.keys(folder.children).length === 0) ? `<span class="text-xs" style="color: var(--text-tertiary); font-weight: 400;">(${this.t('folders.empty')})</span>` : ''}
                             </span>
                         </div>
                         <div class="hover-buttons flex gap-1 transition-opacity absolute right-2 top-1/2 transform -translate-y-1/2" style="opacity: 0; pointer-events: none; background: linear-gradient(to right, transparent, var(--bg-hover) 20%, var(--bg-hover)); padding-left: 20px;" onclick="event.stopPropagation()">
                             <button 
-                                onclick="event.stopPropagation(); window.$root.dropdownTargetFolder = '${escapedPath}'; window.$root.toggleNewDropdown(event)"
+                                data-path="${esc(folder.path)}"
+                                onclick="window.$root.handleNewItemClick(this, event)"
                                 class="px-1.5 py-0.5 text-xs rounded hover:brightness-110"
                                 style="background-color: var(--bg-tertiary); color: var(--text-secondary);"
                                 title="Add item here"
                             >+</button>
                             <button 
-                                onclick="event.stopPropagation(); window.$root.renameFolder('${escapedPath}', '${folder.name.replace(/'/g, "\\'").replace(/\\/g, "\\\\")}')"
+                                data-path="${esc(folder.path)}"
+                                data-name="${esc(folder.name)}"
+                                onclick="window.$root.handleRenameFolderClick(this, event)"
                                 class="px-1.5 py-0.5 text-xs rounded hover:brightness-110"
                                 style="background-color: var(--bg-tertiary); color: var(--text-secondary);"
                                 title="Rename folder"
                             >✏️</button>
                             <button 
-                                onclick="event.stopPropagation(); window.$root.deleteFolder('${escapedPath}', '${folder.name.replace(/'/g, "\\'").replace(/\\/g, "\\\\")}')"
+                                data-path="${esc(folder.path)}"
+                                data-name="${esc(folder.name)}"
+                                onclick="window.$root.handleDeleteFolderClick(this, event)"
                                 class="px-1 py-0.5 text-xs rounded hover:brightness-110"
                                 style="color: var(--error);"
                                 title="Delete folder"
@@ -2103,9 +2371,9 @@ function noteApp() {
                 
                 // First, render child folders (if any)
                 if (folder.children && Object.keys(folder.children).length > 0) {
-                    const children = Object.entries(folder.children).sort((a, b) => 
-                        a[1].name.toLowerCase().localeCompare(b[1].name.toLowerCase())
-                    );
+                    const children = Object.entries(folder.children)
+                        .filter(([k, v]) => !this.hideUnderscoreFolders || !v.name.startsWith('_'))
+                        .sort((a, b) => a[1].name.toLowerCase().localeCompare(b[1].name.toLowerCase()));
                     
                     children.forEach(([childKey, childFolder]) => {
                         html += this.renderFolderRecursive(childFolder, 0, false);
@@ -2115,51 +2383,7 @@ function noteApp() {
                 // Then, render notes and images in this folder (after subfolders)
                 if (folder.notes && folder.notes.length > 0) {
                     folder.notes.forEach(note => {
-                        // Check if it's an image or a note
-                        const isImage = note.type === 'image';
-                        const isCurrentNote = this.currentNote === note.path;
-                        const isCurrentImage = this.currentImage === note.path;
-                        const isCurrent = isImage ? isCurrentImage : isCurrentNote;
-                        
-                        // Different icon for images
-                        const icon = isImage ? '🖼️' : '';
-                        
-                        // Escape paths for use in native event handlers
-                        const escapedNotePath = note.path.replace(/'/g, "\\'").replace(/\\/g, "\\\\");
-                        const escapedNoteName = note.name.replace(/'/g, "\\'").replace(/\\/g, "\\\\");
-                        
-                        // Click handler
-                        const clickHandler = `window.$root.openItem('${escapedNotePath}', '${note.type}')`; 
-                        
-                        // Delete handler
-                        const deleteHandler = isImage
-                            ? `event.stopPropagation(); window.$root.deleteImage('${escapedNotePath}')`
-                            : `event.stopPropagation(); window.$root.deleteNote('${escapedNotePath}', '${escapedNoteName}')`; 
-                        
-                        html += `
-                            <div 
-                                draggable="true"
-                                ondragstart="window.$root.onNoteDragStart('${escapedNotePath}', event)"
-                                ondragend="window.$root.onNoteDragEnd()"
-                                onclick="${clickHandler}"
-                                class="note-item px-2 py-1 text-sm relative"
-                                style="${isCurrent ? 'background-color: var(--accent-light); color: var(--accent-primary);' : 'color: var(--text-primary);'} ${isImage ? 'opacity: 0.85;' : ''} cursor: pointer;"
-                                onmouseover="if('${escapedNotePath}' !== window.$root.currentNote && '${escapedNotePath}' !== window.$root.currentImage) this.style.backgroundColor='var(--bg-hover)'"
-                                onmouseout="if('${escapedNotePath}' !== window.$root.currentNote && '${escapedNotePath}' !== window.$root.currentImage) this.style.backgroundColor='transparent'"
-                            >
-                                <span class="truncate" style="display: block; padding-right: 30px;">${icon}${icon ? ' ' : ''}${note.name}</span>
-                                <button 
-                                    onclick="${deleteHandler}"
-                                    class="note-delete-btn absolute right-2 top-1/2 transform -translate-y-1/2 px-1 py-0.5 text-xs rounded hover:brightness-110 transition-opacity"
-                                    style="opacity: 0; color: var(--error);"
-                                    title="${isImage ? 'Delete image' : 'Delete note'}"
-                                >
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        `;
+                        html += this.renderNoteItem(note);
                     });
                 }
                 
@@ -2168,6 +2392,60 @@ function noteApp() {
             
             html += `</div>`; // Close folder wrapper
             return html;
+        },
+        
+        // Render a single note/media item (used by both folders and root level)
+        renderNoteItem(note) {
+            const esc = (s) => this.escapeHtmlAttr(s);
+            const isMediaFile = note.type !== 'note';
+            const isCurrentNote = this.currentNote === note.path;
+            const isCurrentMedia = this.currentMedia === note.path;
+            const isCurrent = isMediaFile ? isCurrentMedia : isCurrentNote;
+            
+            // Share icon for shared notes
+            const isShared = !isMediaFile && this.isNoteShared(note.path);
+            const shareIcon = isShared ? '<svg title="Shared" style="display: inline-block; width: 12px; height: 12px; vertical-align: middle; margin-right: 2px; opacity: 0.7;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>' : '';
+            const icon = this.getMediaIcon(note.type);
+            
+            return `
+                <div 
+                    data-path="${esc(note.path)}"
+                    data-name="${esc(note.name)}"
+                    data-type="${note.type}"
+                    draggable="true"
+                    ondragstart="window.$root.onItemDragStart(this.dataset.path, this.dataset.type || 'note', event)"
+                    ondragend="window.$root.onItemDragEnd()"
+                    onclick="window.$root.handleItemClick(this)"
+                    class="note-item px-2 py-1 text-sm relative"
+                    style="${isCurrent ? 'background-color: var(--accent-light); color: var(--accent-primary);' : 'color: var(--text-primary);'} ${isMediaFile ? 'opacity: 0.85;' : ''} cursor: pointer;"
+                    onmouseover="window.$root.handleItemHover(this, true)"
+                    onmouseout="window.$root.handleItemHover(this, false)"
+                >
+                    <span class="truncate" style="display: block; padding-right: 30px;" title="${esc(note.name)}">${shareIcon}${icon}${icon ? ' ' : ''}${esc(note.name)}</span>
+                    <button 
+                        data-path="${esc(note.path)}"
+                        data-name="${esc(note.name)}"
+                        data-type="${note.type}"
+                        onclick="window.$root.handleDeleteItemClick(this, event)"
+                        class="note-delete-btn absolute right-2 top-1/2 transform -translate-y-1/2 px-1 py-0.5 text-xs rounded hover:brightness-110 transition-opacity"
+                        style="opacity: 0; color: var(--error);"
+                        title="${isMediaFile ? 'Delete file' : 'Delete note'}"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                </div>
+            `;
+        },
+        
+        // Render root-level items (notes and media not in any folder)
+        renderRootItems() {
+            const root = this.folderTree['__root__'];
+            if (!root || !root.notes || root.notes.length === 0) {
+                return '';
+            }
+            return root.notes.map(note => this.renderNoteItem(note)).join('');
         },
         
         // Toggle folder expansion
@@ -2261,40 +2539,29 @@ function noteApp() {
             }, 200); // Increased delay to ensure Alpine has finished rendering
         },
         
-        // Drag and drop handlers
-        onNoteDragStart(notePath, event) {
-            // Check if this is an image
-            const item = this.notes.find(n => n.path === notePath);
-            const isImage = item && item.type === 'image';
-            
+        // Unified drag and drop handlers for notes, folders, and media
+        onItemDragStart(itemPath, itemType, event) {
             // Set unified drag state
-            this.draggedItem = {
-                path: notePath,
-                type: isImage ? 'image' : 'note'
-            };
+            this.draggedItem = { path: itemPath, type: itemType };
             
-            // For notes, also set legacy draggedNote for folder move logic
-            if (!isImage) {
-                this.draggedNote = notePath;
-                // Make drag image semi-transparent
-                if (event.target) {
-                    event.target.style.opacity = '0.5';
-                }
+            // Make drag image semi-transparent
+            if (event.target) {
+                event.target.style.opacity = '0.5';
             }
             
             event.dataTransfer.effectAllowed = 'all';
         },
         
-        onNoteDragEnd() {
-            this.draggedNote = null;
+        onItemDragEnd() {
             this.draggedItem = null;
             this.dropTarget = null;
             this.dragOverFolder = null;
-            // Reset opacity of all note items
-            document.querySelectorAll('.note-item').forEach(el => el.style.opacity = '1');
-            // Reset drag-over class (more efficient than querying all folder items)
+            // Reset opacity of all draggable items
+            document.querySelectorAll('.note-item, .folder-header').forEach(el => el.style.opacity = '1');
+            // Reset drag-over class
             document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
         },
+        
         
         // Handle dragover on editor to show cursor position
         onEditorDragOver(event) {
@@ -2303,21 +2570,52 @@ function noteApp() {
             event.preventDefault();
             this.dropTarget = 'editor';
             
-            // Update cursor position as user drags over text
+            // Focus the textarea
             const textarea = event.target;
-            const textLength = textarea.value.length;
+            if (textarea.tagName !== 'TEXTAREA') return;
             
-            // Calculate approximate cursor position based on mouse position
-            // This gives a rough idea of where the link will be inserted
             textarea.focus();
             
-            // Try to set cursor at click position (works in most browsers)
-            if (textarea.setSelectionRange && document.caretPositionFromPoint) {
-                const pos = document.caretPositionFromPoint(event.clientX, event.clientY);
-                if (pos && pos.offsetNode === textarea) {
-                    textarea.setSelectionRange(pos.offset, pos.offset);
-                }
+            // Calculate cursor position from mouse coordinates
+            const pos = this.getTextareaCursorFromPoint(textarea, event.clientX, event.clientY);
+            if (pos >= 0) {
+                textarea.setSelectionRange(pos, pos);
             }
+        },
+        
+        // Calculate textarea cursor position from mouse coordinates
+        getTextareaCursorFromPoint(textarea, x, y) {
+            const rect = textarea.getBoundingClientRect();
+            const style = window.getComputedStyle(textarea);
+            const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+            const paddingTop = parseFloat(style.paddingTop) || 0;
+            const paddingLeft = parseFloat(style.paddingLeft) || 0;
+            
+            // Calculate which line we're on
+            const relativeY = y - rect.top - paddingTop + textarea.scrollTop;
+            const lineIndex = Math.max(0, Math.floor(relativeY / lineHeight));
+            
+            // Split content into lines
+            const lines = textarea.value.split('\n');
+            
+            // Find the character position at the start of this line
+            let charPos = 0;
+            for (let i = 0; i < Math.min(lineIndex, lines.length); i++) {
+                charPos += lines[i].length + 1; // +1 for newline
+            }
+            
+            // If we're beyond the last line, position at end
+            if (lineIndex >= lines.length) {
+                return textarea.value.length;
+            }
+            
+            // Approximate character position within the line based on X coordinate
+            const relativeX = x - rect.left - paddingLeft;
+            const charWidth = parseFloat(style.fontSize) * 0.6; // Approximate for monospace
+            const charInLine = Math.max(0, Math.floor(relativeX / charWidth));
+            const lineLength = lines[lineIndex]?.length || 0;
+            
+            return charPos + Math.min(charInLine, lineLength);
         },
         
         // Handle dragenter on editor
@@ -2336,29 +2634,28 @@ function noteApp() {
             }
         },
         
-        // Handle drop into editor to create internal link or upload image
+        // Handle drop into editor to create internal link or upload media
         async onEditorDrop(event) {
             event.preventDefault();
             this.dropTarget = null;
             
-            // Check if files are being dropped (images from file system)
+            // Check if files are being dropped (media from file system)
             if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
-                await this.handleImageDrop(event);
+                await this.handleMediaDrop(event);
                 return;
             }
             
-            // Otherwise, handle note/image link drop from sidebar
+            // Otherwise, handle note/media link drop from sidebar
             if (!this.draggedItem) return;
             
             const notePath = this.draggedItem.path;
-            const isImage = this.draggedItem.type === 'image';
+            const isMediaFile = this.draggedItem.type !== 'note';
             
             let link;
-            if (isImage) {
-                // For images, insert image markdown
-                const filename = notePath.split('/').pop().replace(/\.[^/.]+$/, ''); // Remove extension
-                // Use relative path (not /api/images/) for portability
-                link = `![${filename}](${notePath})`;
+            if (isMediaFile) {
+                // For media files (images, audio, video, PDF), use wiki-style embed link
+                const filename = notePath.split('/').pop();
+                link = `![[${filename}]]`;
             } else {
                 // For notes, insert note link
                 const noteName = notePath.split('/').pop().replace('.md', '');
@@ -2366,9 +2663,11 @@ function noteApp() {
                 link = `[${noteName}](${encodedPath})`;
             }
             
-            // Insert at cursor position
+            // Insert at drop position
             const textarea = event.target;
-            const cursorPos = textarea.selectionStart || 0;
+            // Recalculate position from drop coordinates for accuracy
+            let cursorPos = this.getTextareaCursorFromPoint(textarea, event.clientX, event.clientY);
+            if (cursorPos < 0) cursorPos = textarea.selectionStart || 0;
             const textBefore = this.noteContent.substring(0, cursorPos);
             const textAfter = this.noteContent.substring(cursorPos);
             
@@ -2386,49 +2685,59 @@ function noteApp() {
             this.draggedItem = null;
         },
         
-        // Handle image files dropped into editor
-        async handleImageDrop(event) {
+        // Handle media files dropped into editor
+        async handleMediaDrop(event) {
             if (!this.currentNote) {
                 alert(this.t('notes.open_first'));
                 return;
             }
             
             const files = Array.from(event.dataTransfer.files);
-            const imageFiles = files.filter(file => {
-                const type = file.type.toLowerCase();
-                return type.startsWith('image/') && 
-                       ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'].includes(type);
-            });
             
-            if (imageFiles.length === 0) {
-                alert(this.t('images.no_valid_files'));
+            // Filter for allowed media types
+            const allowedTypes = [
+                // Images
+                'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+                // Audio
+                'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/m4a', 'audio/x-m4a',
+                // Video
+                'video/mp4', 'video/webm', 'video/quicktime',
+                // Documents
+                'application/pdf'
+            ];
+            const mediaFiles = files.filter(file => allowedTypes.includes(file.type.toLowerCase()));
+            
+            if (mediaFiles.length === 0) {
+                alert(this.t('media.no_valid_files'));
                 return;
             }
             
             const textarea = event.target;
-            const cursorPos = textarea.selectionStart || 0;
+            // Calculate cursor position from drop coordinates
+            let cursorPos = this.getTextareaCursorFromPoint(textarea, event.clientX, event.clientY);
+            if (cursorPos < 0) cursorPos = textarea.selectionStart || 0;
             
-            // Upload each image
-            for (const file of imageFiles) {
+            // Upload each media file
+            for (const file of mediaFiles) {
                 try {
-                    const imagePath = await this.uploadImage(file, this.currentNote);
-                    if (imagePath) {
-                        this.insertImageMarkdown(imagePath, file.name, cursorPos);
+                    const mediaPath = await this.uploadMedia(file, this.currentNote);
+                    if (mediaPath) {
+                        await this.insertMediaMarkdown(mediaPath, file.name, cursorPos);
                     }
                 } catch (error) {
-                    ErrorHandler.handle(`upload image ${file.name}`, error);
+                    ErrorHandler.handle(`upload file ${file.name}`, error);
                 }
             }
         },
         
-        // Upload an image file
-        async uploadImage(file, notePath) {
+        // Upload a media file (image, audio, video, PDF)
+        async uploadMedia(file, notePath) {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('note_path', notePath);
             
             try {
-                const response = await fetch('/api/upload-image', {
+                const response = await fetch('/api/upload-media', {
                     method: 'POST',
                     body: formData
                 });
@@ -2445,11 +2754,24 @@ function noteApp() {
             }
         },
         
-        // Insert image markdown at cursor position
-        insertImageMarkdown(imagePath, altText, cursorPos) {
-            const filename = altText.replace(/\.[^/.]+$/, ''); // Remove extension
-            // Use relative path (not /api/images/) for portability
-            const markdown = `![${filename}](${imagePath})`;
+        // Insert media markdown at cursor position using wiki-style syntax
+        // This ensures media links don't break when notes are moved
+        async insertMediaMarkdown(mediaPath, altText, cursorPos) {
+            // Extract just the filename from the path (e.g., "folder/_attachments/image.png" -> "image.png")
+            const filename = mediaPath.split('/').pop();
+            
+            // Use wiki-style embed link: ![[filename.png]] or ![[filename.png|alt text]]
+            // The alt text is optional - only add if different from filename
+            const filenameWithoutExt = filename.replace(/\.[^/.]+$/, '');
+            const altWithoutExt = altText.replace(/\.[^/.]+$/, '');
+            
+            // If alt text is meaningful (not just "pasted-image"), include it
+            const markdown = (altWithoutExt && altWithoutExt !== filenameWithoutExt && !altWithoutExt.startsWith('pasted-image'))
+                ? `![[${filename}|${altWithoutExt}]]`
+                : `![[${filename}]]`;
+            
+            // Reload notes FIRST to update image lookup maps before preview renders
+            await this.loadNotes();
             
             const textBefore = this.noteContent.substring(0, cursorPos);
             const textAfter = this.noteContent.substring(cursorPos);
@@ -2458,12 +2780,9 @@ function noteApp() {
             
             // Trigger autosave
             this.autoSave();
-            
-            // Reload notes to show the new image in sidebar
-            this.loadNotes();
         },
         
-        // Handle paste event for clipboard images
+        // Handle paste event for clipboard media (images)
         async handlePaste(event) {
             if (!this.currentNote) return;
             
@@ -2487,76 +2806,115 @@ function noteApp() {
                             // Create a File from the blob
                             const file = new File([blob], filename, { type: item.type });
                             
-                            const imagePath = await this.uploadImage(file, this.currentNote);
-                            if (imagePath) {
-                                this.insertImageMarkdown(imagePath, filename, cursorPos);
+                            const mediaPath = await this.uploadMedia(file, this.currentNote);
+                            if (mediaPath) {
+                                await this.insertMediaMarkdown(mediaPath, filename, cursorPos);
                             }
                         } catch (error) {
-                            ErrorHandler.handle('paste image', error);
+                            ErrorHandler.handle('paste media', error);
                         }
                     }
-                    break; // Only handle first image
+                    break; // Only handle first media item
                 }
             }
         },
         
-        // Open a note or image (unified handler for sidebar/homepage clicks)
+        // Media type detection based on file extension
+        getMediaType(filename) {
+            if (!filename) return null;
+            const ext = filename.split('.').pop().toLowerCase();
+            const mediaTypes = {
+                image: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+                audio: ['mp3', 'wav', 'ogg', 'm4a'],
+                video: ['mp4', 'webm', 'mov', 'avi'],
+                document: ['pdf'],
+            };
+            for (const [type, extensions] of Object.entries(mediaTypes)) {
+                if (extensions.includes(ext)) return type;
+            }
+            return null;
+        },
+        
+        // Get icon for media type
+        getMediaIcon(type) {
+            const icons = {
+                image: '🖼️',
+                audio: '🎵',
+                video: '🎬',
+                document: '📄',
+            };
+            return icons[type] || '';
+        },
+        
+        // Open a note or media file (unified handler for sidebar/homepage clicks)
         openItem(path, type = 'note', searchHighlight = '') {
             this.showGraph = false;
-            if (type === 'image' || path.match(/\.(png|jpg|jpeg|gif|webp)$/i)) {
-                this.viewImage(path);
+            // Check if it's a media file by type or extension
+            const mediaType = type !== 'note' ? type : this.getMediaType(path);
+            if (mediaType && mediaType !== 'note') {
+                this.viewMedia(path, mediaType);
             } else {
                 this.loadNote(path, true, searchHighlight);
             }
         },
         
-        // View an image in the main pane
-        viewImage(imagePath, updateHistory = true) {
+        // View a media file (image, audio, video, PDF) in the main pane
+        viewMedia(mediaPath, mediaType = null, updateHistory = true) {
             this.showGraph = false; // Ensure graph is closed
             this.currentNote = '';
             this.currentNoteName = '';
             this.noteContent = '';
-            this.currentImage = imagePath;
-            this.viewMode = 'preview'; // Use preview mode to show image
+            this.currentMedia = mediaPath; // Reuse currentMedia for all media
+            this.currentMediaType = mediaType || this.getMediaType(mediaPath) || 'image';
+            this.shareInfo = null; // Reset share info
+            this.viewMode = 'preview'; // Use preview mode to show media
             
-            // Update browser tab title for image
-            const imageName = imagePath.split('/').pop();
-            document.title = `${imageName} - NoteDiscovery`;
+            // Update browser tab title
+            const fileName = mediaPath.split('/').pop();
+            document.title = `${fileName} - ${this.appName}`;
+            
+            // Expand folder tree to show the media file
+            this.expandFolderForNote(mediaPath);
             
             // Update browser URL
             if (updateHistory) {
                 // Encode each path segment to handle special characters
-                const encodedPath = imagePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
+                const encodedPath = mediaPath.split('/').map(segment => encodeURIComponent(segment)).join('/');
                 window.history.pushState(
-                    { imagePath: imagePath },
+                    { mediaPath: mediaPath },
                     '',
                     `/${encodedPath}`
                 );
             }
         },
         
-        // Delete an image
-        async deleteImage(imagePath) {
-            const filename = imagePath.split('/').pop();
-            if (!confirm(this.t('images.confirm_delete', { name: filename }))) return;
+        // Backward compatibility alias
+        viewImage(mediaPath, updateHistory = true) {
+            this.viewMedia(mediaPath, 'image', updateHistory);
+        },
+        
+        // Delete a media file (image, audio, video, PDF)
+        async deleteMedia(mediaPath) {
+            const filename = mediaPath.split('/').pop();
+            if (!confirm(this.t('media.confirm_delete', { name: filename }))) return;
             
             try {
-                const response = await fetch(`/api/notes/${encodeURIComponent(imagePath)}`, {
+                const response = await fetch(`/api/notes/${encodeURIComponent(mediaPath)}`, {
                     method: 'DELETE'
                 });
                 
                 if (response.ok) {
                     await this.loadNotes(); // Refresh tree
                     
-                    // Clear viewer if deleting currently viewed image
-                    if (this.currentImage === imagePath) {
-                        this.currentImage = '';
+                    // Clear viewer if deleting currently viewed media
+                    if (this.currentMedia === mediaPath) {
+                        this.currentMedia = '';
                     }
                 } else {
-                    throw new Error('Failed to delete image');
+                    throw new Error('Failed to delete media file');
                 }
             } catch (error) {
-                ErrorHandler.handle('delete image', error);
+                ErrorHandler.handle('delete media', error);
             }
         },
         
@@ -2569,9 +2927,9 @@ function noteApp() {
             const href = link.getAttribute('href');
             if (!href) return;
             
-            // Check if it's an external link
-            if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//') || href.startsWith('mailto:')) {
-                return; // Let external links work normally
+            // Check if it's an external link or API path (media files, etc.)
+            if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//') || href.startsWith('mailto:') || href.startsWith('/api/')) {
+                return; // Let external links and API paths work normally
             }
             
             // Prevent default navigation for internal links
@@ -2655,28 +3013,9 @@ function noteApp() {
             }
         },
         
-        // Folder drag handlers
-        onFolderDragStart(folderPath, event) {
-            this.draggedFolder = folderPath;
-            // Make drag image semi-transparent
-            if (event && event.target) {
-                event.target.style.opacity = '0.5';
-            }
-        },
-        
-        onFolderDragEnd() {
-            this.draggedFolder = null;
-            this.dropTarget = null;
-            this.dragOverFolder = null;
-            // Reset styles - only query elements with drag-over class (more efficient)
-            document.querySelectorAll('.folder-item').forEach(el => el.style.opacity = '1');
-            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        },
         
         cancelDrag() {
             // Cancel any active drag operation (triggered by ESC key)
-            this.draggedNote = null;
-            this.draggedFolder = null;
             this.draggedItem = null;
             this.dropTarget = null;
             this.dragOverFolder = null;
@@ -2692,122 +3031,62 @@ function noteApp() {
                 return;
             }
             
-            // IMPORTANT: Capture dragged item info immediately before async operations
-            // because ondragend may fire and clear these values
-            const draggedNotePath = this.draggedNote || (this.draggedItem?.type === 'note' ? this.draggedItem.path : null);
-            const draggedFolderPath = this.draggedFolder;
+            // Capture dragged item info immediately (ondragend may clear it)
+            if (!this.draggedItem) return;
+            const { path: draggedPath, type: draggedType } = this.draggedItem;
             
-            // Handle note drop into folder
-            if (draggedNotePath) {
-                const note = this.notes.find(n => n.path === draggedNotePath);
-                if (!note) return;
-                
-                // Don't allow moving images to folders
-                if (note.type === 'image') {
-                    return;
-                }
-                
-                // Get note filename
-                const filename = note.path.split('/').pop();
-                const newPath = targetFolderPath ? `${targetFolderPath}/${filename}` : filename;
-                
-                if (newPath === draggedNotePath) {
-                    return;
-                }
-                
-                // Check if this note is favorited BEFORE the async call
-                const wasFavorited = this.favoritesSet.has(draggedNotePath);
-                
-                try {
-                    const response = await fetch('/api/notes/move', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            oldPath: draggedNotePath,
-                            newPath: newPath
-                        })
-                    });
-                    
-                    if (response.ok) {
-                        // Update favorites if the moved note was favorited
-                        if (wasFavorited) {
-                            // Update Array (create new array for reactivity)
-                            const newFavorites = this.favorites.map(f => f === draggedNotePath ? newPath : f);
-                            this.favorites = newFavorites;
-                            // Recreate Set from array for consistency
-                            this.favoritesSet = new Set(newFavorites);
-                            this.saveFavorites();
-                        }
-                        
-                        // Keep current note open if it was the moved note
-                        const wasCurrentNote = this.currentNote === draggedNotePath;
-                        
-                        await this.loadNotes();
-                        
-                        if (wasCurrentNote) {
-                            this.currentNote = newPath;
-                        }
-                    } else {
-                        const errorData = await response.json().catch(() => ({}));
-                        alert(errorData.detail || this.t('move.failed_note'));
-                    }
-                } catch (error) {
-                    console.error('Failed to move note:', error);
-                    alert(this.t('move.failed_note'));
-                }
-                
-                return;
-            }
+            // Determine item category for endpoint selection
+            const isFolder = draggedType === 'folder';
+            const isNote = draggedType === 'note';
+            const isMedia = !isFolder && !isNote; // image, audio, video, document
             
-            // Handle folder drop into folder
-            if (draggedFolderPath) {
+            // Handle folder drop
+            if (isFolder) {
                 // Prevent dropping folder into itself or its subfolders
-                if (targetFolderPath === draggedFolderPath || 
-                    targetFolderPath.startsWith(draggedFolderPath + '/')) {
+                if (targetFolderPath === draggedPath || 
+                    targetFolderPath.startsWith(draggedPath + '/')) {
                     alert(this.t('folders.cannot_move_into_self'));
                     return;
                 }
                 
-                const folderName = draggedFolderPath.split('/').pop();
+                const folderName = draggedPath.split('/').pop();
                 const newPath = targetFolderPath ? `${targetFolderPath}/${folderName}` : folderName;
                 
-                if (newPath === draggedFolderPath) {
-                    return;
-                }
+                if (newPath === draggedPath) return;
                 
                 // Capture favorites info before async call
-                const oldPrefix = draggedFolderPath + '/';
+                const oldPrefix = draggedPath + '/';
                 const newPrefix = newPath + '/';
                 
                 try {
                     const response = await fetch('/api/folders/move', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            oldPath: draggedFolderPath,
-                            newPath: newPath
-                        })
+                        body: JSON.stringify({ oldPath: draggedPath, newPath })
                     });
                     
                     if (response.ok) {
-                        // Update favorites that were in the moved folder
-                        const newFavorites = this.favorites.map(f => {
-                            if (f.startsWith(oldPrefix)) {
-                                return f.replace(oldPrefix, newPrefix);
-                            }
-                            return f;
-                        });
-                        // Check if anything changed
-                        if (JSON.stringify(newFavorites) !== JSON.stringify(this.favorites)) {
+                        // Update favorites for notes inside moved folder
+                        const favoritesInFolder = this.favorites.filter(f => f.startsWith(oldPrefix));
+                        if (favoritesInFolder.length > 0) {
+                            const newFavorites = this.favorites.map(f => 
+                                f.startsWith(oldPrefix) ? newPrefix + f.substring(oldPrefix.length) : f
+                            );
                             this.favorites = newFavorites;
                             this.favoritesSet = new Set(newFavorites);
                             this.saveFavorites();
                         }
                         
+                        // Keep folder expanded if it was
+                        const wasExpanded = this.expandedFolders.has(draggedPath);
+                        
                         await this.loadNotes();
-                        // Update current note path if it was in the moved folder
-                        if (this.currentNote && this.currentNote.startsWith(oldPrefix)) {
-                            this.currentNote = this.currentNote.replace(oldPrefix, newPrefix);
+                        await this.loadSharedNotePaths();
+                        
+                        if (wasExpanded) {
+                            this.expandedFolders.delete(draggedPath);
+                            this.expandedFolders.add(newPath);
+                            this.saveExpandedFolders();
                         }
                     } else {
                         const errorData = await response.json().catch(() => ({}));
@@ -2817,9 +3096,62 @@ function noteApp() {
                     console.error('Failed to move folder:', error);
                     alert(this.t('move.failed_folder'));
                 }
-                this.dropTarget = null;
+                return;
+            }
+            
+            // Handle note or media drop into folder
+            const item = this.notes.find(n => n.path === draggedPath);
+            if (!item) return;
+            
+            const filename = draggedPath.split('/').pop();
+            const newPath = targetFolderPath ? `${targetFolderPath}/${filename}` : filename;
+            
+            if (newPath === draggedPath) return;
+            
+            // Check if note is favorited (only for notes)
+            const wasFavorited = isNote && this.favoritesSet.has(draggedPath);
+            
+            try {
+                // Use different endpoint for media vs notes
+                const endpoint = isMedia ? '/api/media/move' : '/api/notes/move';
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ oldPath: draggedPath, newPath })
+                });
+                
+                if (response.ok) {
+                    // Update favorites if the moved note was favorited
+                    if (wasFavorited) {
+                        const newFavorites = this.favorites.map(f => f === draggedPath ? newPath : f);
+                        this.favorites = newFavorites;
+                        this.favoritesSet = new Set(newFavorites);
+                        this.saveFavorites();
+                    }
+                    
+                    // Keep current item open if it was the moved one
+                    const wasCurrentNote = this.currentNote === draggedPath;
+                    const wasCurrentMedia = this.currentMedia === draggedPath;
+                    
+                    await this.loadNotes();
+                    if (isNote) {
+                        await this.loadSharedNotePaths();
+                    }
+                    
+                    if (wasCurrentNote) this.currentNote = newPath;
+                    if (wasCurrentMedia) this.currentMedia = newPath;
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    const errorKey = isMedia ? 'move.failed_media' : 'move.failed_note';
+                    alert(errorData.detail || this.t(errorKey));
+                }
+            } catch (error) {
+                console.error(`Failed to move ${isMedia ? 'media' : 'note'}:`, error);
+                const errorKey = isMedia ? 'move.failed_media' : 'move.failed_note';
+                alert(this.t(errorKey));
             }
         },
+        
         
         // Load a specific note
         async loadNote(notePath, updateHistory = true, searchQuery = '') {
@@ -2836,8 +3168,8 @@ function noteApp() {
                         window.history.replaceState({ homepageFolder: this.selectedHomepageFolder || '' }, '', '/');
                         this.currentNote = '';
                         this.noteContent = '';
-                        this.currentImage = '';
-                        document.title = 'NoteDiscovery';
+                        this.currentMedia = '';
+                        document.title = this.appName;
                         return;
                     }
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -2848,12 +3180,14 @@ function noteApp() {
                 this.currentNote = notePath;
                 this._lastRenderedContent = ''; // Clear render cache for new note
                 this._cachedRenderedHTML = '';
+                this._initializedVideoSources = new Set(); // Clear video cache for new note
                 this.noteContent = data.content;
                 this.currentNoteName = notePath.split('/').pop().replace('.md', '');
-                this.currentImage = ''; // Clear image viewer when loading a note
+                this.currentMedia = ''; // Clear image viewer when loading a note
+                this.shareInfo = null; // Reset share info for new note
                 
                 // Update browser tab title
-                document.title = `${this.currentNoteName} - NoteDiscovery`;
+                document.title = `${this.currentNoteName} - ${this.appName}`;
                 this.lastSaved = false;
                 
                 // Extract outline for TOC panel
@@ -2932,9 +3266,9 @@ function noteApp() {
             }
         },
         
-        // Load note from URL path
-        loadNoteFromURL() {
-            // Get path from URL (e.g., /folder/note or /note)
+        // Load item (note or media) from URL path
+        loadItemFromURL() {
+            // Get path from URL (e.g., /folder/note or /folder/image.png)
             let path = window.location.pathname;
             
             // Strip .md extension if present (for MKdocs/Zensical integration)
@@ -2952,12 +3286,12 @@ function noteApp() {
             // Remove leading slash and decode URL encoding (e.g., %20 -> space)
             const decodedPath = decodeURIComponent(path.substring(1));
             
-            // Check if this is an image path (check if it exists in notes list as an image)
+            // Check if this is a media file (image, audio, video, PDF)
             const matchedItem = this.notes.find(n => n.path === decodedPath);
             
-            if (matchedItem && matchedItem.type === 'image') {
-                // It's an image, view it
-                this.viewImage(decodedPath, false); // false = don't update history (we're already at this URL)
+            if (matchedItem && matchedItem.type !== 'note') {
+                // It's a media file, view it
+                this.viewMedia(decodedPath, matchedItem.type, false); // false = don't update history
             } else {
                 // It's a note, add .md extension and load it
                 const notePath = decodedPath + '.md';
@@ -3206,6 +3540,20 @@ function noteApp() {
         // UNIFIED CREATION FUNCTIONS (reusable from anywhere)
         // =====================================================
         
+        // Switch to split view (if in preview-only mode) and focus editor for new notes
+        focusEditorForNewNote() {
+            // Only switch if in preview-only mode - don't disturb edit or split mode
+            if (this.viewMode === 'preview') {
+                this.viewMode = 'split';
+                this.saveViewMode();
+            }
+            // Focus the editor after a short delay to ensure DOM is updated
+            this.$nextTick(() => {
+                const editor = document.getElementById('note-editor');
+                if (editor) editor.focus();
+            });
+        },
+        
         async createNote(folderPath = null, directPath = null) {
             let notePath;
             
@@ -3271,6 +3619,7 @@ function noteApp() {
                     if (folderPart) this.expandedFolders.add(folderPart);
                     await this.loadNotes();
                     await this.loadNote(notePath);
+                    this.focusEditorForNewNote();
                 } else {
                     ErrorHandler.handle('create note', new Error('Server returned error'));
                 }
@@ -3438,7 +3787,7 @@ function noteApp() {
                     if (this.currentNote && this.currentNote.startsWith(folderPrefix)) {
                         this.currentNote = '';
                         this.noteContent = '';
-                        document.title = 'NoteDiscovery';
+                        document.title = this.appName;
                     }
                     
                     await this.loadNotes();
@@ -3932,7 +4281,7 @@ function noteApp() {
                         this.currentNoteName = '';
                         this._lastRenderedContent = ''; // Clear render cache
                         this._cachedRenderedHTML = '';
-                        document.title = 'NoteDiscovery';
+                        document.title = this.appName;
                         // Redirect to root
                         window.history.replaceState({}, '', '/');
                     }
@@ -3947,6 +4296,26 @@ function noteApp() {
         },
         
         // Search notes
+        debouncedSearchNotes() {
+            if (this.searchDebounceTimeout) {
+                clearTimeout(this.searchDebounceTimeout);
+            }
+
+            const hasTextSearch = this.searchQuery.trim().length > 0;
+            if (!hasTextSearch) {
+                this.isSearching = false;
+                this.searchNotes();
+                return;
+            }
+
+            this.isSearching = true;
+            this.searchResults = [];
+
+            this.searchDebounceTimeout = setTimeout(() => {
+                this.searchNotes();
+            }, CONFIG.SEARCH_DEBOUNCE_DELAY);
+        },
+
         // Search notes by text (calls unified filter logic)
         async searchNotes() {
             await this.applyFilters();
@@ -4108,7 +4477,70 @@ function noteApp() {
             
             // Convert Obsidian-style wikilinks: [[note]] or [[note|display text]]
             // Must be done before marked.parse() to avoid conflicts with markdown syntax
+            // BUT we need to protect code blocks first to avoid converting [[text]] inside code
             const self = this; // Reference for closure
+            
+            // Step 1: Temporarily replace code blocks and inline code with placeholders
+            const codeBlocks = [];
+            // Protect fenced code blocks (```...```)
+            contentToRender = contentToRender.replace(/```[\s\S]*?```/g, (match) => {
+                codeBlocks.push(match);
+                return `\x00CODEBLOCK${codeBlocks.length - 1}\x00`;
+            });
+            // Protect inline code (`...`)
+            contentToRender = contentToRender.replace(/`[^`]+`/g, (match) => {
+                codeBlocks.push(match);
+                return `\x00CODEBLOCK${codeBlocks.length - 1}\x00`;
+            });
+            
+            // Step 2: Convert media wikilinks FIRST: ![[file.png]] or ![[file.png|alt text]]
+            // Must be before note wikilinks to prevent [[file.png]] from being matched first
+            contentToRender = contentToRender.replace(
+                /!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,
+                (match, mediaName, altText) => {
+                    const filename = mediaName.trim();
+                    const alt = altText ? altText.trim() : filename.replace(/\.[^/.]+$/, '');
+                    
+                    // Resolve media path using O(1) lookup
+                    const mediaPath = self.resolveMediaWikilink(filename);
+                    
+                    if (mediaPath) {
+                        // URL-encode path segments for the API
+                        const encodedPath = mediaPath.split('/').map(segment => {
+                            try {
+                                return encodeURIComponent(decodeURIComponent(segment));
+                            } catch (e) {
+                                return encodeURIComponent(segment);
+                            }
+                        }).join('/');
+                        
+                        const safeAlt = alt.replace(/"/g, '&quot;');
+                        const mediaSrc = `/api/media/${encodedPath}`;
+                        const mediaType = self.getMediaType(filename);
+                        
+                        // Return appropriate HTML based on media type
+                        switch (mediaType) {
+                            case 'audio':
+                                return `<div class="media-embed media-audio"><audio controls preload="none" src="${mediaSrc}" title="${safeAlt}"></audio><span class="media-caption">${safeAlt}</span></div>`;
+                            case 'video':
+                                return `<div class="media-embed media-video"><video controls preload="none" poster="" src="${mediaSrc}" title="${safeAlt}"></video></div>`;
+                            case 'document':
+                                // Local PDFs: show iframe preview
+                                return `<div class="media-embed media-pdf"><iframe src="${mediaSrc}" title="${safeAlt}"></iframe></div>`;
+                            default: // image
+                                return `<img src="${mediaSrc}" alt="${safeAlt}" title="${safeAlt}">`;
+                        }
+                    }
+                    
+                    // Media not found - return broken indicator
+                    const safeFilename = filename.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const mediaType = self.getMediaType(filename);
+                    const icon = mediaType === 'audio' ? '🎵' : mediaType === 'video' ? '🎬' : mediaType === 'document' ? '📄' : '🖼️';
+                    return `<span class="wikilink-broken" title="Media not found">${icon} ${safeFilename}</span>`;
+                }
+            );
+            
+            // Step 2b: Convert note wikilinks: [[note]] or [[note|display text]]
             contentToRender = contentToRender.replace(
                 /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,
                 (match, target, displayText) => {
@@ -4131,6 +4563,11 @@ function noteApp() {
                 }
             );
             
+            // Step 3: Restore code blocks
+            contentToRender = contentToRender.replace(/\x00CODEBLOCK(\d+)\x00/g, (match, index) => {
+                return codeBlocks[parseInt(index)];
+            });
+            
             // Configure marked with syntax highlighting
             marked.setOptions({
                 breaks: true,
@@ -4149,6 +4586,11 @@ function noteApp() {
             
             // Parse markdown
             let html = marked.parse(contentToRender);
+            
+            // Sanitize HTML to prevent XSS attacks
+            // DOMPurify defaults allow most HTML/SVG tags but strip scripts, iframes, and event handlers
+            // MathJax and Mermaid run AFTER this, so their elements don't need whitelisting
+            html = DOMPurify.sanitize(html);
             
             // Post-process: Add target="_blank" to external links and title attributes to images
             // Parse as DOM to safely manipulate
@@ -4173,17 +4615,17 @@ function noteApp() {
             });
             
             // Find all images and transform paths for display
+            // Also convert non-image media (audio, video, PDF) to appropriate elements
             const images = tempDiv.querySelectorAll('img');
             images.forEach(img => {
-                const src = img.getAttribute('src');
+                let src = img.getAttribute('src');
                 if (src) {
-                    // Transform relative paths to /api/images/ for serving
-                    // Skip external URLs and already-transformed paths
-                    if (!src.startsWith('http://') && !src.startsWith('https://') && 
-                        !src.startsWith('//') && !src.startsWith('/api/images/') &&
-                        !src.startsWith('data:')) {
+                    const isExternal = src.startsWith('http://') || src.startsWith('https://') || src.startsWith('//');
+                    const isLocal = !isExternal && !src.startsWith('data:');
+                    
+                    // Transform relative paths to /api/media/ for serving
+                    if (isLocal && !src.startsWith('/api/media/')) {
                         // URL-encode path segments to handle spaces and special characters
-                        // Decode first to avoid double-encoding if path already contains %XX sequences
                         const encodedPath = src.split('/').map(segment => {
                             try {
                                 return encodeURIComponent(decodeURIComponent(segment));
@@ -4191,13 +4633,56 @@ function noteApp() {
                                 return encodeURIComponent(segment);
                             }
                         }).join('/');
-                        img.setAttribute('src', `/api/images/${encodedPath}`);
+                        src = `/api/media/${encodedPath}`;
+                        img.setAttribute('src', src);
                     }
+                    
+                    // Check if this is non-image media and convert to appropriate element
+                    const mediaType = self.getMediaType(src);
+                    const altText = img.getAttribute('alt') || src.split('/').pop().replace(/\.[^/.]+$/, '');
+                    const safeAlt = altText.replace(/"/g, '&quot;');
+                    
+                    // Only convert LOCAL media to embedded elements (security)
+                    // External non-image media gets styled links instead
+                    if (isLocal || src.startsWith('/api/media/')) {
+                        if (mediaType === 'audio') {
+                            const wrapper = document.createElement('div');
+                            wrapper.className = 'media-embed media-audio';
+                            wrapper.innerHTML = `<audio controls preload="none" src="${src}" title="${safeAlt}"></audio><span class="media-caption">${safeAlt}</span>`;
+                            img.replaceWith(wrapper);
+                            return;
+                        } else if (mediaType === 'video') {
+                            const wrapper = document.createElement('div');
+                            wrapper.className = 'media-embed media-video';
+                            wrapper.innerHTML = `<video controls preload="none" poster="" src="${src}" title="${safeAlt}"></video>`;
+                            img.replaceWith(wrapper);
+                            return;
+                        } else if (mediaType === 'document') {
+                            // Local PDFs: show iframe preview
+                            const wrapper = document.createElement('div');
+                            wrapper.className = 'media-embed media-pdf';
+                            wrapper.innerHTML = `<iframe src="${src}" title="${safeAlt}"></iframe>`;
+                            img.replaceWith(wrapper);
+                            return;
+                        }
+                    } else if (isExternal && mediaType === 'document') {
+                        // External PDFs: styled link (opens in new tab)
+                        const link = document.createElement('a');
+                        link.href = src;
+                        link.target = '_blank';
+                        link.rel = 'noopener noreferrer';
+                        link.className = 'pdf-link';
+                        link.title = `Open ${safeAlt}`;
+                        link.innerHTML = `<span class="pdf-link-content">📄 ${safeAlt}</span><span class="pdf-link-note">Opens in new tab</span>`;
+                        img.replaceWith(link);
+                        return;
+                    }
+                    // External audio/video: leave as broken image for security
                 }
                 
+                // For regular images, set title attribute
                 const altText = img.getAttribute('alt');
                 if (altText) {
-                    // Set title attribute to show alt text on hover
                     img.setAttribute('title', altText);
                 }
             });
@@ -4231,6 +4716,17 @@ function noteApp() {
                             this.addCopyButtonToCodeBlock(pre);
                         }
                     });
+                    
+                    // Enable video metadata loading (for first frame preview)
+                    // Track by source URL to prevent duplicate requests on re-renders
+                    if (!this._initializedVideoSources) this._initializedVideoSources = new Set();
+                    previewEl.querySelectorAll('video[preload="none"]').forEach((video) => {
+                        const src = video.getAttribute('src');
+                        if (src && !this._initializedVideoSources.has(src)) {
+                            this._initializedVideoSources.add(src);
+                            video.preload = 'metadata';
+                        }
+                    });
                 }
             }, 0);
             
@@ -4250,22 +4746,35 @@ function noteApp() {
         
         // Add copy button to code block
         addCopyButtonToCodeBlock(preElement) {
-            // Create copy button
+            // Extract language from code element class (e.g., "language-toml" -> "TOML")
+            const codeElement = preElement.querySelector('code');
+            let language = '';
+            if (codeElement && codeElement.className) {
+                const match = codeElement.className.match(/language-(\w+)/);
+                if (match) {
+                    const langMap = {
+                        'js': 'JavaScript', 'ts': 'TypeScript', 'py': 'Python',
+                        'rb': 'Ruby', 'cs': 'C#', 'cpp': 'C++', 'sh': 'Shell',
+                        'bash': 'Bash', 'zsh': 'Zsh', 'yml': 'YAML', 'md': 'Markdown'
+                    };
+                    const rawLang = match[1].toLowerCase();
+                    language = langMap[rawLang] || match[1].toUpperCase();
+                }
+            }
+            
+            // Create copy button with language label
             const button = document.createElement('button');
             button.className = 'copy-code-button';
-            button.innerHTML = `
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-            `;
-            button.title = 'Copy to clipboard';
+            const displayText = language || this.t('common.copy_to_clipboard').split(' ')[0]; // Use first word as fallback
+            button.innerHTML = `<span>${displayText}</span>`;
+            button.dataset.originalText = displayText; // Store for restore after copy
+            button.title = this.t('common.copy_to_clipboard');
             
             // Style the button
             button.style.position = 'absolute';
             button.style.top = '8px';
             button.style.right = '8px';
-            button.style.padding = '6px';
+            button.style.padding = '4px 10px';
             button.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
             button.style.border = 'none';
             button.style.borderRadius = '4px';
@@ -4277,6 +4786,11 @@ function noteApp() {
             button.style.alignItems = 'center';
             button.style.justifyContent = 'center';
             button.style.zIndex = '10';
+            button.style.fontSize = '11px';
+            button.style.fontWeight = '600';
+            button.style.fontFamily = 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace';
+            button.style.textTransform = 'uppercase';
+            button.style.letterSpacing = '0.5px';
             
             // Style the pre element to be relative
             preElement.style.position = 'relative';
@@ -4300,28 +4814,23 @@ function noteApp() {
                 
                 const code = codeElement.textContent;
                 
+                const originalText = button.dataset.originalText;
+                const copiedText = this.t('common.copied');
+                const copyTitle = this.t('common.copy_to_clipboard');
+                
                 try {
                     await navigator.clipboard.writeText(code);
                     
-                    // Visual feedback - change icon to checkmark
-                    button.innerHTML = `
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                    `;
+                    // Visual feedback - show localized "Copied!"
+                    button.innerHTML = `<span>${copiedText}</span>`;
                     button.style.backgroundColor = 'rgba(34, 197, 94, 0.8)';
-                    button.title = 'Copied!';
+                    button.title = copiedText;
                     
                     // Reset after 2 seconds
                     setTimeout(() => {
-                        button.innerHTML = `
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                            </svg>
-                        `;
+                        button.innerHTML = `<span>${originalText}</span>`;
                         button.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
-                        button.title = 'Copy to clipboard';
+                        button.title = copyTitle;
                     }, 2000);
                 } catch (err) {
                     console.error('Failed to copy code:', err);
@@ -4336,19 +4845,10 @@ function noteApp() {
                     
                     try {
                         document.execCommand('copy');
-                        button.innerHTML = `
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                        `;
+                        button.innerHTML = `<span>${copiedText}</span>`;
                         button.style.backgroundColor = 'rgba(34, 197, 94, 0.8)';
                         setTimeout(() => {
-                            button.innerHTML = `
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                </svg>
-                            `;
+                            button.innerHTML = `<span>${originalText}</span>`;
                             button.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
                         }, 2000);
                     } catch (fallbackErr) {
@@ -4802,32 +5302,9 @@ function noteApp() {
             return Array.isArray(this.noteMetadata.tags) ? this.noteMetadata.tags : [this.noteMetadata.tags];
         },
         
-        // Load sidebar width from localStorage
-        loadSidebarWidth() {
-            const saved = localStorage.getItem('sidebarWidth');
-            if (saved) {
-                const width = parseInt(saved, 10);
-                if (width >= 200 && width <= 600) {
-                    this.sidebarWidth = width;
-                }
-            }
-        },
-        
         // Save sidebar width to localStorage
         saveSidebarWidth() {
             localStorage.setItem('sidebarWidth', this.sidebarWidth.toString());
-        },
-        
-        // Load view mode from localStorage
-        loadViewMode() {
-            try {
-                const saved = localStorage.getItem('viewMode');
-                if (saved && ['edit', 'split', 'preview'].includes(saved)) {
-                    this.viewMode = saved;
-                }
-            } catch (error) {
-                console.error('Error loading view mode:', error);
-            }
         },
         
         // Save view mode to localStorage
@@ -4836,17 +5313,6 @@ function noteApp() {
                 localStorage.setItem('viewMode', this.viewMode);
             } catch (error) {
                 console.error('Error saving view mode:', error);
-            }
-        },
-        
-        loadTagsExpanded() {
-            try {
-                const saved = localStorage.getItem('tagsExpanded');
-                if (saved !== null) {
-                    this.tagsExpanded = saved === 'true';
-                }
-            } catch (error) {
-                console.error('Error loading tags expanded state:', error);
             }
         },
         
@@ -4948,17 +5414,6 @@ function noteApp() {
             }
         },
         
-        // Load editor width from localStorage
-        loadEditorWidth() {
-            const saved = localStorage.getItem('editorWidth');
-            if (saved) {
-                const width = parseFloat(saved);
-                if (width >= 20 && width <= 80) {
-                    this.editorWidth = width;
-                }
-            }
-        },
-        
         // Save editor width to localStorage
         saveEditorWidth() {
             localStorage.setItem('editorWidth', this.editorWidth.toString());
@@ -5008,15 +5463,57 @@ function noteApp() {
                 // Get current rendered HTML (this already has markdown converted and will have LaTeX delimiters)
                 let renderedHTML = this.renderedMarkdown;
                 
+                // Convert non-image media (audio, video, PDF) to placeholders first
+                // These shouldn't be embedded as base64 (too large)
+                // Use CSS variables with fallbacks for theme-aware styling (matches backend export.py)
+                const mediaPlaceholder = (type, name) => {
+                    const icons = { audio: '🎵', video: '🎬', document: '📄' };
+                    const labels = { audio: 'Audio file', video: 'Video file', document: 'PDF document' };
+                    const icon = icons[type] || '📎';
+                    const label = labels[type] || 'Media file';
+                    return `<div style="margin:1.5rem 0;padding:1.5rem;background:linear-gradient(135deg,var(--bg-tertiary,#f8f9fa) 0%,var(--bg-secondary,#e9ecef) 100%);border:1px solid var(--border-primary,#dee2e6);border-radius:0.5rem;display:flex;align-items:center;gap:1rem;">
+<span style="font-size:2rem;">${icon}</span>
+<div>
+<div style="font-weight:600;color:var(--text-primary,#212529);">${name}</div>
+<div style="font-size:0.875rem;color:var(--text-secondary,#6c757d);">${label} — not available in exported view</div>
+</div>
+</div>`;
+                };
+                
+                // Replace audio embeds with placeholders
+                renderedHTML = renderedHTML.replace(
+                    /<div class="media-embed media-audio">.*?<audio[^>]*src="[^"]*\/([^"\/]+)"[^>]*>.*?<\/div>/gs,
+                    (match, filename) => mediaPlaceholder('audio', decodeURIComponent(filename).replace(/\.[^.]+$/, ''))
+                );
+                
+                // Replace video embeds with placeholders
+                renderedHTML = renderedHTML.replace(
+                    /<div class="media-embed media-video">.*?<video[^>]*src="[^"]*\/([^"\/]+)"[^>]*>.*?<\/div>/gs,
+                    (match, filename) => mediaPlaceholder('video', decodeURIComponent(filename).replace(/\.[^.]+$/, ''))
+                );
+                
+                // Replace PDF embeds with placeholders
+                renderedHTML = renderedHTML.replace(
+                    /<div class="media-embed media-pdf">.*?<iframe[^>]*src="[^"]*\/([^"\/]+)"[^>]*>.*?<\/div>/gs,
+                    (match, filename) => mediaPlaceholder('document', decodeURIComponent(filename).replace(/\.[^.]+$/, ''))
+                );
+                
                 // Embed local images as base64 for fully self-contained HTML
-                const imgRegex = /src="\/api\/images\/([^"]+)"/g;
+                // Handle both /api/media/ and legacy /api/images/ paths
+                const imgRegex = /src="\/api\/(?:media|images)\/([^"]+)"/g;
                 const imgMatches = [...renderedHTML.matchAll(imgRegex)];
                 
                 for (const match of imgMatches) {
                     const encodedPath = match[1];
+                    // Skip non-image files (already handled above)
+                    const ext = encodedPath.split('.').pop().toLowerCase();
+                    if (!['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+                        continue;
+                    }
+                    
                     try {
                         // Fetch the image
-                        const imgResponse = await fetch(`/api/images/${encodedPath}`);
+                        const imgResponse = await fetch(`/api/media/${encodedPath}`);
                         if (imgResponse.ok) {
                             const blob = await imgResponse.blob();
                             // Convert to base64 data URL
@@ -5268,6 +5765,248 @@ function noteApp() {
             }, 1500);
         },
         
+        // ============================================================================
+        // Share Functions
+        // ============================================================================
+        
+        // Load list of shared note paths (for visual indicators)
+        async loadSharedNotePaths() {
+            try {
+                const response = await fetch('/api/shared-notes');
+                if (response.ok) {
+                    const data = await response.json();
+                    this._sharedNotePaths = new Set(data.paths || []);
+                }
+            } catch (error) {
+                console.error('Failed to load shared note paths:', error);
+                this._sharedNotePaths = new Set();
+            }
+        },
+        
+        // Check if a note is currently shared (O(1) lookup)
+        isNoteShared(notePath) {
+            return this._sharedNotePaths.has(notePath);
+        },
+        
+        // ============================================
+        // Quick Switcher (Ctrl+Alt+P)
+        // ============================================
+        
+        openQuickSwitcher() {
+            this.showQuickSwitcher = true;
+            this.quickSwitcherQuery = '';
+            this.quickSwitcherIndex = 0;
+            // Populate initial results
+            this.quickSwitcherResults = (this.allNotes || []).slice(0, 10);
+            // Focus the input after the modal renders
+            this.$nextTick(() => {
+                const input = document.getElementById('quickSwitcherInput');
+                if (input) input.focus();
+            });
+        },
+        
+        closeQuickSwitcher() {
+            this.showQuickSwitcher = false;
+            this.quickSwitcherQuery = '';
+            this.quickSwitcherIndex = 0;
+        },
+        
+        // Filter notes for quick switcher based on query
+        filterQuickSwitcher(query) {
+            // Only include actual notes, not images
+            const notes = (this.notes || []).filter(n => n.type === 'note');
+            if (!query || !query.trim()) {
+                // Show recent notes when no query
+                return notes.slice(0, 10);
+            }
+            const q = query.toLowerCase();
+            return notes
+                .filter(n => 
+                    n.name.toLowerCase().includes(q) || 
+                    n.path.toLowerCase().includes(q)
+                )
+                .slice(0, 10);
+        },
+        
+        // Handle keyboard navigation in quick switcher
+        handleQuickSwitcherKeydown(e) {
+            const results = this.quickSwitcherResults;
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                this.quickSwitcherIndex = Math.min(this.quickSwitcherIndex + 1, results.length - 1);
+                this.scrollQuickSwitcherIntoView();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                this.quickSwitcherIndex = Math.max(this.quickSwitcherIndex - 1, 0);
+                this.scrollQuickSwitcherIntoView();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const note = results[this.quickSwitcherIndex];
+                if (note) {
+                    this.loadNote(note.path);
+                    this.closeQuickSwitcher();
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                this.closeQuickSwitcher();
+            }
+        },
+        
+        // Scroll selected item into view in quick switcher
+        scrollQuickSwitcherIntoView() {
+            this.$nextTick(() => {
+                const items = document.querySelectorAll('[data-quick-switcher-item]');
+                if (items[this.quickSwitcherIndex]) {
+                    items[this.quickSwitcherIndex].scrollIntoView({ block: 'nearest' });
+                }
+            });
+        },
+        
+        // Select note from quick switcher by click
+        selectQuickSwitcherNote(note) {
+            this.loadNote(note.path);
+            this.closeQuickSwitcher();
+        },
+        
+        // Close share modal and reset state after animation
+        closeShareModal() {
+            this.showShareModal = false;
+            // Delay state reset until modal is fully hidden
+            setTimeout(() => {
+                this.showShareQR = false;
+                this.shareInfo = null;
+                this.shareLoading = false;
+            }, 200);
+        },
+        
+        // Generate QR code for share URL
+        generateQRCode(url) {
+            if (!url || typeof qrcode === 'undefined') return '';
+            try {
+                const qr = qrcode(0, 'M'); // 0 = auto version, M = medium error correction
+                qr.addData(url);
+                qr.make();
+                return qr.createDataURL(4); // 4 = module size in pixels
+            } catch (e) {
+                console.error('QR code generation failed:', e);
+                return '';
+            }
+        },
+        
+        // Open share modal and fetch current share status
+        async openShareModal() {
+            if (!this.currentNote) return;
+            
+            // Reset state BEFORE showing modal to prevent flicker
+            this.showShareQR = false;
+            this.shareInfo = null;
+            this.shareLoading = true;
+            this.showShareModal = true;
+            
+            try {
+                const notePath = this.currentNote.replace('.md', '');
+                const encodedPath = notePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
+                const response = await fetch(`/api/share/${encodedPath}`);
+                
+                if (response.ok) {
+                    this.shareInfo = await response.json();
+                } else {
+                    this.shareInfo = { shared: false };
+                }
+            } catch (error) {
+                console.error('Failed to get share status:', error);
+                this.shareInfo = { shared: false };
+            } finally {
+                this.shareLoading = false;
+            }
+        },
+        
+        // Create a share link for the current note (with current theme)
+        async createShareLink() {
+            if (!this.currentNote) return;
+            
+            this.shareLoading = true;
+            
+            try {
+                const notePath = this.currentNote.replace('.md', '');
+                const encodedPath = notePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
+                const response = await fetch(`/api/share/${encodedPath}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ theme: this.currentTheme || 'light' })
+                });
+                
+                if (response.ok) {
+                    this.shareInfo = await response.json();
+                    this.shareInfo.shared = true;
+                    // Update the shared paths set
+                    this._sharedNotePaths.add(this.currentNote);
+                } else {
+                    const error = await response.json();
+                    alert(this.t('share.error_creating', { error: error.detail || 'Unknown error' }));
+                }
+            } catch (error) {
+                console.error('Failed to create share link:', error);
+                alert(this.t('share.error_creating', { error: error.message }));
+            } finally {
+                this.shareLoading = false;
+            }
+        },
+        
+        // Copy share link to clipboard
+        async copyShareLink() {
+            if (!this.shareInfo?.url) return;
+            
+            try {
+                await navigator.clipboard.writeText(this.shareInfo.url);
+            } catch (error) {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = this.shareInfo.url;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            }
+            
+            this.shareLinkCopied = true;
+            setTimeout(() => {
+                this.shareLinkCopied = false;
+            }, 2000);
+        },
+        
+        // Revoke share link
+        async revokeShareLink() {
+            if (!this.currentNote) return;
+            
+            if (!confirm(this.t('share.confirm_revoke'))) return;
+            
+            this.shareLoading = true;
+            
+            try {
+                const notePath = this.currentNote.replace('.md', '');
+                const encodedPath = notePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
+                const response = await fetch(`/api/share/${encodedPath}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    this.shareInfo = { shared: false };
+                    // Update the shared paths set
+                    this._sharedNotePaths.delete(this.currentNote);
+                } else {
+                    const error = await response.json();
+                    alert(this.t('share.error_revoking', { error: error.detail || 'Unknown error' }));
+                }
+            } catch (error) {
+                console.error('Failed to revoke share link:', error);
+                alert(this.t('share.error_revoking', { error: error.message }));
+            } finally {
+                this.shareLoading = false;
+            }
+        },
+        
         // Toggle Zen Mode (full immersive writing experience)
         async toggleZenMode() {
             if (!this.zenMode) {
@@ -5326,9 +6065,9 @@ function noteApp() {
             this.currentNote = '';
             this.currentNoteName = '';
             this.noteContent = '';
-            this.currentImage = '';
+            this.currentMedia = '';
             this.outline = [];
-            document.title = 'NoteDiscovery';
+            document.title = this.appName;
             
             // Invalidate cache to force recalculation
             this._homepageCache = {
@@ -5348,10 +6087,10 @@ function noteApp() {
             this.currentNote = '';
             this.currentNoteName = '';
             this.noteContent = '';
-            this.currentImage = '';
+            this.currentMedia = '';
             this.outline = [];
             this.mobileSidebarOpen = false;
-            document.title = 'NoteDiscovery';
+            document.title = this.appName;
             
             // Clear undo/redo history
             this.undoHistory = [];
@@ -5367,6 +6106,18 @@ function noteApp() {
             };
             
             window.history.pushState({ homepageFolder: '' }, '', '/');
+        },
+        
+        // Mobile files/home tab - context-aware behavior
+        mobileFilesTabClick() {
+            if (this.currentNote || this.currentMedia || this.showGraph) {
+                // Viewing content → go home
+                this.goHome();
+            } else {
+                // On homepage → toggle files sidebar
+                this.activePanel = 'files';
+                this.mobileSidebarOpen = !this.mobileSidebarOpen;
+            }
         },
         
         // ==================== GRAPH VIEW ====================

@@ -23,7 +23,8 @@
     "loading": "Loading...",
     "saved": "✓ Saved",
     "saving": "Saving...",
-    "copied": "✓ Copied!",
+    "copied": "Copied!",
+    "copy_to_clipboard": "Copy to clipboard",
     "failed": "Failed to {{action}}. Please try again."
   },
 
@@ -115,6 +116,30 @@
     "exit_hint": "Exit Zen Mode (Esc)"
   },
 
+  "share": {
+    "button_tooltip": "Share note",
+    "modal_title": "Share Note",
+    "not_shared_description": "This note is not currently shared. Create a link to share it with anyone.",
+    "shared_description": "Anyone with this link can view this note:",
+    "create_link": "Create Share Link",
+    "copy": "Copy",
+    "stop_sharing": "Stop Sharing",
+    "confirm_revoke": "Are you sure you want to stop sharing this note? The share link will no longer work.",
+    "error_creating": "Failed to create share link: {{error}}",
+    "error_revoking": "Failed to revoke share link: {{error}}",
+    "show_qr": "Show QR Code",
+    "hide_qr": "Hide QR Code"
+  },
+
+  "quick_switcher": {
+    "placeholder": "Type to search notes...",
+    "no_results": "No matching notes",
+    "recent_hint": "Showing recent notes. Type to search all.",
+    "navigate": "navigate",
+    "open": "open",
+    "close": "close"
+  },
+
   "tags": {
     "title": "Tags",
     "no_tags": "No tags found",
@@ -171,16 +196,17 @@
     "error_incorrect_password": "Incorrect password. Please try again."
   },
 
-  "images": {
-    "confirm_delete": "Delete image \"{{name}}\"?",
-    "upload_failed": "Failed to upload image",
-    "no_valid_files": "No valid image files found. Supported formats: JPG, PNG, GIF, WEBP",
-    "formats": "Supports JPG, PNG, GIF, WebP (max 10MB)"
+  "media": {
+    "confirm_delete": "Delete \"{{name}}\"?",
+    "upload_failed": "Failed to upload file",
+    "no_valid_files": "No valid files found. Supported: JPG, PNG, GIF, WebP, MP3, MP4, PDF",
+    "formats": "JPG, PNG, GIF, WebP, MP3, MP4, PDF"
   },
 
   "move": {
     "failed_note": "Failed to move note.",
-    "failed_folder": "Failed to move folder."
+    "failed_folder": "Failed to move folder.",
+    "failed_media": "Failed to move media file."
   },
 
   "search": {
@@ -189,7 +215,9 @@
     "matches": "{{current}} of {{total}}",
     "match_of": "Match {{current}} of {{total}}",
     "result_singular": "result",
-    "result_plural": "results"
+    "result_plural": "results",
+    "no_results": "No notes contain \"{{query}}\"",
+    "searching": "Searching for \"{{query}}\"..."
   },
 
   "theme": {
@@ -218,7 +246,11 @@
 
   "settings": {
     "account": "Account",
-    "logout": "Logout"
+    "logout": "Logout",
+    "readable_line_length": "Readable line length",
+    "readable_line_length_desc": "Limit preview width for easier reading",
+    "hide_underscore_folders": "Hide system folders",
+    "hide_underscore_folders_desc": "Hide _attachments, _templates and other underscore folders from sidebar"
   },
 
   "homepage": {
@@ -258,6 +290,7 @@
   },
 
   "support": {
+<<<<<<< HEAD
     "enjoying_demo": "Support this project"
   },
 
@@ -278,6 +311,16 @@
     "reset_defaults": "Reset defaults",
     "invalid_shortcut": "Invalid shortcut",
     "duplicate_shortcut": "This shortcut is already in use"
+=======
+    "enjoying_demo": "Support this project",
+    "deploy_own": "Deploy your own instance",
+    "thank_you": "Thank you for your support! 💚"
+  },
+
+  "demo": {
+    "title": "DEMO MODE",
+    "warning": "Contents reset daily. Changes may be overwritten by other users."
+>>>>>>> f5147ccc14a9d122541847a272c1b5d1b5fbb534
   }
 }
 

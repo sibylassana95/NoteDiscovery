@@ -17,14 +17,35 @@ NoteDiscovery supports environment variables to override configuration settings,
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `AUTHENTICATION_ENABLED` | boolean | `config.yaml` | Enable/disable authentication |
-| `AUTHENTICATION_PASSWORD_HASH` | string | `config.yaml` | Bcrypt password hash |
+| `AUTHENTICATION_PASSWORD` | string | `admin` | Password (hashed automatically at startup) |
 | `AUTHENTICATION_SECRET_KEY` | string | `config.yaml` | Session secret key (for session security) |
+| `AUTHENTICATION_API_KEY` | string | - | API key for external integrations (MCP, scripts) |
+
+#### Example: Setting password via environment variable
+
+```bash
+# Docker
+docker run -e AUTHENTICATION_ENABLED=true -e AUTHENTICATION_PASSWORD=mysecretpassword ...
+
+# Docker Compose (in .env file or docker-compose.yml)
+AUTHENTICATION_PASSWORD=mysecretpassword
+```
 
 ### Demo Mode
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `DEMO_MODE` | boolean | `false` | Enable demo mode (enables rate limiting and other demo restrictions) |
+
+### Support
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `ALREADY_DONATED` | boolean | `false` | Hides the support buttons in the Settings pane |
+
+> ⚠️ **Disclaimer:** No verification exists. But legend says that setting this to `true` without donating causes your next `git push` to fail silently. Just once. When it matters most.
+>
+> Haven't donated yet? [☕ Buy me a coffee](https://ko-fi.com/gamosoft) - it takes 30 seconds and makes my day!
 
 ## 🎯 Configuration Priority
 

@@ -23,7 +23,8 @@
     "loading": "Chargement...",
     "saved": "✓ Enregistré",
     "saving": "Enregistrement...",
-    "copied": "✓ Copié !",
+    "copied": "Copié !",
+    "copy_to_clipboard": "Copier dans le presse-papiers",
     "failed": "Échec de {{action}}. Veuillez réessayer."
   },
 
@@ -43,6 +44,7 @@
     "no_notes": "Pas encore de notes. Créez votre première note !",
     "no_notes_yet": "Pas encore de notes ni de dossiers.",
     "create_first": "Créez votre première note ou dossier !",
+    "drop_to_root": "Déposer ici pour la racine",
     "no_favorites": "Pas encore de favoris",
     "no_results": "Aucun résultat trouvé",
     "expand_all": "Développer tous les dossiers",
@@ -115,6 +117,30 @@
     "exit_hint": "Quitter le Mode Zen (Échap)"
   },
 
+  "share": {
+    "button_tooltip": "Partager la note",
+    "modal_title": "Partager la Note",
+    "not_shared_description": "Cette note n'est pas partagée actuellement. Créez un lien pour la partager avec n'importe qui.",
+    "shared_description": "Toute personne disposant de ce lien peut voir cette note :",
+    "create_link": "Créer un lien de partage",
+    "copy": "Copier",
+    "stop_sharing": "Arrêter le partage",
+    "confirm_revoke": "Êtes-vous sûr de vouloir arrêter le partage de cette note ? Le lien ne fonctionnera plus.",
+    "error_creating": "Échec de la création du lien : {{error}}",
+    "error_revoking": "Échec de la révocation du lien : {{error}}",
+    "show_qr": "Afficher le code QR",
+    "hide_qr": "Masquer le code QR"
+  },
+
+  "quick_switcher": {
+    "placeholder": "Rechercher des notes...",
+    "no_results": "Aucun résultat",
+    "recent_hint": "Notes récentes. Tapez pour tout rechercher.",
+    "navigate": "naviguer",
+    "open": "ouvrir",
+    "close": "fermer"
+  },
+
   "tags": {
     "title": "Étiquettes",
     "no_tags": "Aucune étiquette trouvée",
@@ -171,16 +197,17 @@
     "error_incorrect_password": "Mot de passe incorrect. Veuillez réessayer."
   },
 
-  "images": {
-    "confirm_delete": "Supprimer l'image \"{{name}}\" ?",
-    "upload_failed": "Échec du téléchargement de l'image",
-    "no_valid_files": "Aucun fichier image valide trouvé. Formats supportés : JPG, PNG, GIF, WEBP",
-    "formats": "Supporte JPG, PNG, GIF, WebP (max 10 Mo)"
+  "media": {
+    "confirm_delete": "Supprimer \"{{name}}\" ?",
+    "upload_failed": "Échec du téléchargement du fichier",
+    "no_valid_files": "Aucun fichier valide trouvé. Supporté : JPG, PNG, GIF, WebP, MP3, MP4, PDF",
+    "formats": "JPG, PNG, GIF, WebP, MP3, MP4, PDF"
   },
 
   "move": {
     "failed_note": "Échec du déplacement de la note.",
-    "failed_folder": "Échec du déplacement du dossier."
+    "failed_folder": "Échec du déplacement du dossier.",
+    "failed_media": "Échec du déplacement du fichier multimédia."
   },
 
   "search": {
@@ -189,7 +216,9 @@
     "matches": "{{current}} sur {{total}}",
     "match_of": "Résultat {{current}} sur {{total}}",
     "result_singular": "résultat",
-    "result_plural": "résultats"
+    "result_plural": "résultats",
+    "no_results": "Aucune note ne contient \"{{query}}\"",
+    "searching": "Recherche de \"{{query}}\"..."
   },
 
   "theme": {
@@ -246,7 +275,11 @@
 
   "settings": {
     "account": "Compte",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "readable_line_length": "Longueur de ligne lisible",
+    "readable_line_length_desc": "Limiter la largeur de l'aperçu pour une lecture plus facile",
+    "hide_underscore_folders": "Masquer les dossiers système",
+    "hide_underscore_folders_desc": "Masquer _attachments, _templates et autres dossiers préfixés"
   },
 
   "homepage": {
@@ -286,7 +319,14 @@
   },
 
   "support": {
-    "enjoying_demo": "Soutenez ce projet"
+    "enjoying_demo": "Soutenez ce projet",
+    "deploy_own": "Déployez votre propre instance",
+    "thank_you": "Merci pour votre soutien ! 💚"
+  },
+
+  "demo": {
+    "title": "MODE DÉMO",
+    "warning": "Le contenu est réinitialisé quotidiennement. Les modifications peuvent être écrasées par d'autres utilisateurs."
   }
 }
 

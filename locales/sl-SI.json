@@ -23,7 +23,8 @@
     "loading": "Nalaganje...",
     "saved": "✓ Shranjeno",
     "saving": "Shranjevanje...",
-    "copied": "✓ Kopirano!",
+    "copied": "Kopirano!",
+    "copy_to_clipboard": "Kopiraj v odložišče",
     "failed": "Napaka pri {{action}}. Prosimo, poskusite znova."
   },
 
@@ -115,6 +116,30 @@
     "exit_hint": "Izhod iz zen načina (Esc)"
   },
 
+  "share": {
+    "button_tooltip": "Deli zapis",
+    "modal_title": "Deli zapis",
+    "not_shared_description": "Ta zapis trenutno ni deljen. Ustvarite povezavo za deljenje z drugimi.",
+    "shared_description": "Kdor ima to povezavo, si lahko ogleda zapis:",
+    "create_link": "Ustvari povezavo za deljenje",
+    "copy": "Kopiraj",
+    "stop_sharing": "Prenehaj deliti",
+    "confirm_revoke": "Ali ste prepričani, da želite prenehati deliti ta zapis? Povezava ne bo več delovala.",
+    "error_creating": "Napaka pri ustvarjanju povezave: {{error}}",
+    "error_revoking": "Napaka pri preklicu povezave: {{error}}",
+    "show_qr": "Prikaži QR kodo",
+    "hide_qr": "Skrij QR kodo"
+  },
+
+  "quick_switcher": {
+    "placeholder": "Išči beležke...",
+    "no_results": "Ni rezultatov",
+    "recent_hint": "Prikaz nedavnih beležk. Vnesite za iskanje.",
+    "navigate": "navigiraj",
+    "open": "odpri",
+    "close": "zapri"
+  },
+
   "tags": {
     "title": "Oznake",
     "no_tags": "Ni najdenih oznak",
@@ -171,16 +196,17 @@
     "error_incorrect_password": "Napačno geslo. Prosimo, poskusite znova."
   },
 
-  "images": {
-    "confirm_delete": "Izbrišem sliko \"{{name}}\"?",
-    "upload_failed": "Nalaganje slike ni uspelo",
-    "no_valid_files": "Ni najdenih veljavnih slikovnih datotek. Podprti formati: JPG, PNG, GIF, WEBP",
-    "formats": "Podpira JPG, PNG, GIF, WebP (največ 10MB)"
+  "media": {
+    "confirm_delete": "Izbrišem \"{{name}}\"?",
+    "upload_failed": "Nalaganje datoteke ni uspelo",
+    "no_valid_files": "Ni najdenih veljavnih datotek. Podprto: JPG, PNG, GIF, WebP, MP3, MP4, PDF",
+    "formats": "JPG, PNG, GIF, WebP, MP3, MP4, PDF"
   },
 
   "move": {
     "failed_note": "Napaka pri premikanju zapisa.",
-    "failed_folder": "Napaka pri premikanju mape."
+    "failed_folder": "Napaka pri premikanju mape.",
+    "failed_media": "Napaka pri premikanju medijske datoteke."
   },
 
   "search": {
@@ -189,7 +215,9 @@
     "matches": "{{current}} od {{total}}",
     "match_of": "Zadetek {{current}} od {{total}}",
     "result_singular": "rezultat",
-    "result_plural": "rezultatov"
+    "result_plural": "rezultatov",
+    "no_results": "Nobena beležka ne vsebuje \"{{query}}\"",
+    "searching": "Iskanje \"{{query}}\"..."
   },
 
   "theme": {
@@ -218,7 +246,11 @@
 
   "settings": {
     "account": "Račun",
-    "logout": "Odjava"
+    "logout": "Odjava",
+    "readable_line_length": "Berljiva dolžina vrstice",
+    "readable_line_length_desc": "Omejite širino predogleda za lažje branje",
+    "hide_underscore_folders": "Skrij sistemske mape",
+    "hide_underscore_folders_desc": "Skrij _attachments, _templates in druge mape s podčrtajem"
   },
 
   "homepage": {
@@ -258,6 +290,7 @@
   },
 
   "support": {
+<<<<<<< HEAD
     "enjoying_demo": "Podprite ta projekt"
   },
 
@@ -278,5 +311,15 @@
     "reset_defaults": "Ponastavi privzete",
     "invalid_shortcut": "Neveljavna bližnjica",
     "duplicate_shortcut": "Ta bližnjica je že v uporabi"
+=======
+    "enjoying_demo": "Podprite ta projekt",
+    "deploy_own": "Namestite svojo instanco",
+    "thank_you": "Hvala za podporo! 💚"
+  },
+
+  "demo": {
+    "title": "DEMO NAČIN",
+    "warning": "Vsebina se dnevno ponastavi. Spremembe lahko prepišejo drugi uporabniki."
+>>>>>>> f5147ccc14a9d122541847a272c1b5d1b5fbb534
   }
 }

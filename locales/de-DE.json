@@ -23,7 +23,8 @@
     "loading": "Laden...",
     "saved": "✓ Gespeichert",
     "saving": "Speichern...",
-    "copied": "✓ Kopiert!",
+    "copied": "Kopiert!",
+    "copy_to_clipboard": "In Zwischenablage kopieren",
     "failed": "{{action}} fehlgeschlagen. Bitte versuche es erneut."
   },
 
@@ -43,6 +44,7 @@
     "no_notes": "Du hast noch keine Notizen. Erstelle deine erste!",
     "no_notes_yet": "Noch keine Notizen oder Ordner.",
     "create_first": "Erstelle deine erste Notiz oder Ordner!",
+    "drop_to_root": "Hier ablegen für Stammverzeichnis",
     "no_favorites": "Noch keine Favoriten",
     "no_results": "Keine Ergebnisse gefunden",
     "expand_all": "Alle Ordner aufklappen",
@@ -115,6 +117,30 @@
     "exit_hint": "Zen-Modus beenden (Esc)"
   },
 
+  "share": {
+    "button_tooltip": "Notiz teilen",
+    "modal_title": "Notiz teilen",
+    "not_shared_description": "Diese Notiz ist derzeit nicht geteilt. Erstellen Sie einen Link, um sie mit anderen zu teilen.",
+    "shared_description": "Jeder mit diesem Link kann diese Notiz sehen:",
+    "create_link": "Freigabelink erstellen",
+    "copy": "Kopieren",
+    "stop_sharing": "Freigabe beenden",
+    "confirm_revoke": "Sind Sie sicher, dass Sie die Freigabe dieser Notiz beenden möchten? Der Freigabelink funktioniert dann nicht mehr.",
+    "error_creating": "Fehler beim Erstellen des Freigabelinks: {{error}}",
+    "error_revoking": "Fehler beim Widerrufen des Freigabelinks: {{error}}",
+    "show_qr": "QR-Code anzeigen",
+    "hide_qr": "QR-Code ausblenden"
+  },
+
+  "quick_switcher": {
+    "placeholder": "Notizen suchen...",
+    "no_results": "Keine Ergebnisse",
+    "recent_hint": "Zeigt aktuelle Notizen. Tippen zum Suchen.",
+    "navigate": "navigieren",
+    "open": "öffnen",
+    "close": "schließen"
+  },
+
   "tags": {
     "title": "Tags",
     "no_tags": "Keine Tags gefunden",
@@ -171,16 +197,17 @@
     "error_incorrect_password": "Falsches Passwort. Bitte versuche es erneut."
   },
 
-  "images": {
-    "confirm_delete": "Bild \"{{name}}\" löschen?",
-    "upload_failed": "Bild-Upload fehlgeschlagen",
-    "no_valid_files": "Keine gültigen Bilddateien gefunden. Unterstützte Formate: JPG, PNG, GIF, WEBP",
-    "formats": "Unterstützt JPG, PNG, GIF, WebP (max 10MB)"
+  "media": {
+    "confirm_delete": "\"{{name}}\" löschen?",
+    "upload_failed": "Datei-Upload fehlgeschlagen",
+    "no_valid_files": "Keine gültigen Dateien gefunden. Unterstützt: JPG, PNG, GIF, WebP, MP3, MP4, PDF",
+    "formats": "JPG, PNG, GIF, WebP, MP3, MP4, PDF"
   },
 
   "move": {
     "failed_note": "Verschieben der Notiz fehlgeschlagen.",
-    "failed_folder": "Verschieben des Ordners fehlgeschlagen."
+    "failed_folder": "Verschieben des Ordners fehlgeschlagen.",
+    "failed_media": "Verschieben der Mediendatei fehlgeschlagen."
   },
 
   "search": {
@@ -189,7 +216,9 @@
     "matches": "{{current}} von {{total}}",
     "match_of": "Treffer {{current}} von {{total}}",
     "result_singular": "Ergebnis",
-    "result_plural": "Ergebnisse"
+    "result_plural": "Ergebnisse",
+    "no_results": "Keine Notizen enthalten \"{{query}}\"",
+    "searching": "Suche nach \"{{query}}\"..."
   },
 
   "theme": {
@@ -218,7 +247,11 @@
 
   "settings": {
     "account": "Konto",
-    "logout": "Abmelden"
+    "logout": "Abmelden",
+    "readable_line_length": "Lesbare Zeilenlänge",
+    "readable_line_length_desc": "Vorschaubreite für bessere Lesbarkeit begrenzen",
+    "hide_underscore_folders": "Systemordner ausblenden",
+    "hide_underscore_folders_desc": "_attachments, _templates und andere Unterstrich-Ordner ausblenden"
   },
 
   "homepage": {
@@ -258,6 +291,7 @@
   },
 
   "support": {
+<<<<<<< HEAD
     "enjoying_demo": "Unterstütze dieses Projekt"
   },
 
@@ -293,6 +327,16 @@
       "toggle_preview": "Vorschau Umschalten",
       "export_html": "HTML Exportieren"
     }
+=======
+    "enjoying_demo": "Unterstütze dieses Projekt",
+    "deploy_own": "Eigene Instanz bereitstellen",
+    "thank_you": "Danke für deine Unterstützung! 💚"
+  },
+
+  "demo": {
+    "title": "DEMO-MODUS",
+    "warning": "Inhalte werden täglich zurückgesetzt. Änderungen können von anderen Benutzern überschrieben werden."
+>>>>>>> f5147ccc14a9d122541847a272c1b5d1b5fbb534
   }
 }
 

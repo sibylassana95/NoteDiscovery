@@ -12,12 +12,18 @@
 - **Copy code blocks** - One-click copy button on hover
 - **LaTeX/Math rendering** - Beautiful mathematical equations with MathJax (see [MATHJAX.md](MATHJAX.md))
 - **Mermaid diagrams** - Create flowcharts, sequence diagrams, and more (see [MERMAID.md](MERMAID.md))
-- **HTML Export** - Export notes as standalone HTML files
+- **HTML Export** - Export notes as standalone HTML files with embedded images
+- **Public Sharing** - Share notes via token-based URLs with optional QR code for mobile (see [SHARING.md](SHARING.md))
 
-### Image Support
-- **Drag & drop upload** - Drop images from your file system directly into the editor
+### Media Support
+- **Drag & drop upload** - Drop files from your file system directly into the editor
 - **Clipboard paste** - Paste images from clipboard with Ctrl+V
-- **Multiple formats** - Supports JPG, PNG, GIF, and WebP (max 10MB)
+- **Images** - JPG, PNG, GIF, WebP (max 10MB)
+- **Audio** - MP3, WAV, OGG, M4A (max 50MB)
+- **Video** - MP4, WebM, MOV, AVI (max 100MB)
+- **Documents** - PDF (max 20MB)
+- **In-app viewing** - View all media types directly in the sidebar
+- **Inline preview** - Audio/video players and PDF viewer embedded in notes
 
 ### Organization
 - **Folder hierarchy** - Organize notes in nested folders
@@ -25,6 +31,7 @@
 - **Alphabetical sorting** - Find notes quickly
 - **Rename anything** - Files and folders, instantly
 - **Visual tree view** - Expandable/collapsible navigation
+- **Hide system folders** - Toggle to hide `_attachments`, `_templates` and other underscore-prefixed folders from sidebar
 
 ## 🔗 Linking & Discovery
 
@@ -285,6 +292,7 @@ date: {{date}}
 
 | Windows/Linux | Mac | Action |
 |---------------|-----|--------|
+| `Ctrl+Alt+P` | `Cmd+Option+P` | Quick Switcher (jump to any note) |
 | `Ctrl+S` | `Cmd+S` | Save note |
 | `Ctrl+Alt+N` | `Cmd+Option+N` | New note |
 | `Ctrl+Alt+F` | `Cmd+Option+F` | New folder |
@@ -303,8 +311,10 @@ date: {{date}}
 |---------------|-----|--------|--------|
 | `Ctrl+B` | `Cmd+B` | Bold | `**text**` |
 | `Ctrl+I` | `Cmd+I` | Italic | `*text*` |
-| `Ctrl+K` | `Cmd+K` | Insert link | `[text](url)` |
+| `Ctrl+K` | `Cmd+K` | Insert link (in editor) | `[text](url)` |
 | `Ctrl+Alt+T` | `Cmd+Option+T` | Insert table | 3x3 table placeholder |
+
+> **Tip:** Use `Ctrl+Alt+P` to quickly jump to any note from anywhere in the app.
 
 ## 🧘 Zen Mode
 
@@ -318,12 +328,67 @@ Full immersive distraction-free writing experience:
 - **Easy exit** - Press `Esc`, click exit button, or use shortcut again
 - **State preserved** - Returns to your previous view mode on exit
 
+## 📱 Progressive Web App (PWA)
+
+NoteDiscovery can be installed as a standalone app on your device:
+
+- **Install as app** - Add to home screen on mobile, or install via browser on desktop
+- **Standalone mode** - Runs without browser chrome for a native app feel
+
+### How to Install
+- **Desktop (Chrome/Edge)**: Click the install icon in the address bar, or Menu → "Install NoteDiscovery"
+- **Android**: Chrome Menu → "Add to Home Screen"
+- **iOS**: Safari Share → "Add to Home Screen"
+
+## 🌍 Internationalization
+
+- **Multiple languages** - English, Spanish, German, French built-in
+- **Easy to add** - Drop JSON files in `locales/` folder
+- **Instant switch** - Change language in Settings without reload
+- **Community translations** - Contributions welcome!
+
+## 🔐 Authentication
+
+- **Password protection** - Single-user login system
+- **Session-based auth** - Secure cookie-based sessions (7 days default)
+- **API key support** - Bearer token or `X-API-Key` header for external integrations
+- **Environment overrides** - Configure via env vars for Docker deployments
+
+📄 **See [AUTHENTICATION.md](AUTHENTICATION.md)** for setup guide.
+
+## 🤖 AI Integration (MCP)
+
+Built-in **Model Context Protocol (MCP)** server for AI assistant integration:
+
+- **Search notes** - AI can search through your knowledge base
+- **Read content** - AI can read and understand your notes
+- **Browse tags** - AI understands your organization
+- **Create notes** - AI can save summaries and insights
+- **Knowledge graph** - AI can explore note relationships
+- **Zero setup** - Works with Docker or Python, just add config to Cursor/Claude
+
+### Quick Setup (Docker)
+```json
+{
+  "mcpServers": {
+    "notediscovery": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "ghcr.io/gamosoft/notediscovery:latest", "python", "-m", "mcp_server"],
+      "env": { "NOTEDISCOVERY_URL": "http://host.docker.internal:8000" }
+    }
+  }
+}
+```
+
+📄 **See [MCP.md](MCP.md)** for complete setup guide.
+
 ## 🚀 Performance
 
 - **Instant loading** - No lag, no loading spinners
 - **Efficient caching** - Smart local storage
 - **Minimal resources** - Runs on modest hardware
 - **No bloat** - Focused on what matters
+- **Lightweight** - No heavy frameworks
 
 ---
 

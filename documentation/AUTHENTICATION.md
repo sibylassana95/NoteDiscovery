@@ -1,179 +1,172 @@
 # 🔒 NoteDiscovery Authentication Guide
 
-## ⚠️ **IMPORTANT: Default Password Warning**
+## ⚠️ Default Password Warning
 
-> **The default `config.yaml` includes authentication disabled by default, with password: `admin`**
->
-> 🔴 **CHANGE THIS if you're exposing NoteDiscovery to a network!**
->
-> The default configuration is provided for **quick testing only**. Follow the setup guide below to set your own secure password and secret key.
+> **Default password is `admin`** — CHANGE THIS before exposing to any network!
 
 ---
 
 ## Overview
 
-NoteDiscovery includes a simple, secure authentication system for single-user deployments. When enabled, users must log in with a password before accessing the application.
+NoteDiscovery includes simple password protection for single-user deployments. When enabled, users must log in before accessing notes.
 
-## ✨ Features
-
-- ✅ **Single User** - Perfect for personal/self-hosted use
-- ✅ **Secure** - Passwords hashed with bcrypt
-- ✅ **Session-based** - Stay logged in for 7 days (configurable)
+- ✅ Single user / self-hosted use
+- ✅ Passwords hashed with bcrypt
+- ✅ Session-based (7 days default, configurable)
 
 ---
 
-## 🚀 Quick Setup
+## Quick Test (Local Only)
 
-**Default Configuration:**
-- Authentication is **disabled by default**
-- Default password is `admin`
-- Default secret key is insecure
+For local testing, authentication is **disabled by default**. To test with auth:
 
-**⚠️ IMPORTANT:** For production or network-exposed deployments, **change both the password and secret key immediately**.
-
----
-
-### 🧪 **Quick Test (Use Default Password)**
-
-For **local testing only**, you can use the default configuration:
-
-1. Start NoteDiscovery (Docker or locally)
-2. Navigate to `http://localhost:8000`
+1. Set `authentication.enabled: true` in `config.yaml`
+2. Restart the app
 3. Log in with password: `admin`
 
-**⚠️ Only use this for local testing on your own machine!**
+⚠️ **Don't use the default password on any network!**
 
 ---
 
-### 🔒 **Production Setup (Change Password & Secret Key)**
+## Production Setup
 
 For any deployment exposed to a network, follow these steps:
 
-### Step 1: Generate a Password Hash
+### Step 1: Generate a Secret Key
 
-Choose your environment:
-
-**Docker Users:**
+The secret key encrypts session cookies. Generate a random one:
 
 ```bash
-# Docker Compose with the GHCR compose file
-docker-compose -f docker-compose.ghcr.yml exec notediscovery python generate_password.py
-
-# Or with docker run
-docker exec -it notediscovery python generate_password.py
-```
-
-**Local Users:**
-
-```bash
-# Install bcrypt if not already installed
-pip install bcrypt
-
-# Run the password generator
-python generate_password.py
-```
-
-The script will:
-1. Prompt you for your password (input is hidden)
-2. Ask you to confirm it
-3. Generate a bcrypt hash
-4. Display the hash with instructions
-
-**Copy the hash** - you'll need it for Step 3.
-
-### Step 2: Generate a Secret Key
-
-Generate a random secret key for session encryption:
-
-**Docker Users:**
-```bash
-docker-compose exec notediscovery python -c "import secrets; print(secrets.token_hex(32))"
-
-# Or with docker run
+# Docker
 docker exec -it notediscovery python -c "import secrets; print(secrets.token_hex(32))"
-```
 
-**Local Users:**
-```bash
+# Local
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-**Copy the key** - you'll need it for Step 3.
-
-### Step 3: Update `config.yaml`
-
-Edit your `config.yaml` and update the authentication section:
-
-```yaml
-authentication:
-  # Enable authentication
-  enabled: true
-  
-  # Session secret key (paste the output from Step 2)
-  secret_key: "your_generated_secret_key_here"
-  
-  # Password hash (paste the output from Step 1)
-  password_hash: "$2b$12$..."
-  
-  # Session expiry in seconds (7 days by default)
-  session_max_age: 604800
-```
-
-### Step 4: Restart the Application
-
-```bash
-# If running locally
-uvicorn backend.main:app --reload
-
-# If using Docker Compose
-docker-compose restart
-
-# Or with docker run
-docker restart notediscovery
-```
-
-### Step 5: Test Login
-
-Navigate to `http://localhost:8000` and you'll be redirected to the login page.
-
-Enter the password you chose in Step 2.
+**Save this key** — you'll need it in Step 2.
 
 ---
 
-## 🔒 Security Considerations
+### Step 2: Configure Authentication
+
+Your password is automatically hashed at startup using bcrypt.
+
+**Via Environment Variables (Docker):**
+```bash
+docker run -d \
+  -e AUTHENTICATION_ENABLED=true \
+  -e AUTHENTICATION_PASSWORD=your_secure_password \
+  -e AUTHENTICATION_SECRET_KEY=your_generated_secret_key \
+  ...
+```
+
+**Via config.yaml:**
+```yaml
+authentication:
+  enabled: true
+  password: "your_secure_password"
+  secret_key: "your_generated_secret_key"
+```
+
+---
+
+### Step 3: Restart & Test
+
+```bash
+# Docker Compose
+docker-compose restart
+
+# Docker run
+docker restart notediscovery
+
+# Local
+python run.py
+```
+
+Navigate to `http://localhost:8000` — you'll be redirected to the login page.
+
+---
+
+## Configuration Priority
+
+Environment variables override config.yaml:
+
+| Priority | Source |
+|----------|--------|
+| 1st | `AUTHENTICATION_PASSWORD` env var |
+| 2nd | `password` in config.yaml |
+
+**Example:** If you set `AUTHENTICATION_PASSWORD` as an env var, it overrides config.yaml.
+
+---
+
+## Security Considerations
 
 ### ✅ What This Protects
 
 - Unauthorized access to your notes
-- Viewing, creating, editing, and deleting notes
 - All API endpoints
+- Viewing, creating, editing, deleting notes
 
 ### ⚠️ What This Doesn't Protect
 
-This is a **simple authentication system** designed for **self-hosted, single-user** deployments. It is **NOT** suitable for:
+This is a **simple single-user** system. NOT suitable for:
 
 - ❌ Multi-user environments
-- ❌ Public internet exposure without HTTPS
-- ❌ Production SaaS applications
+- ❌ Public internet without HTTPS
 - ❌ Compliance requirements (HIPAA, GDPR, etc.)
 
 ### 🛡️ Best Practices
 
-1. **Use HTTPS** - Always run behind a reverse proxy (Traefik, nginx, Caddy) with SSL/TLS
-2. **Strong Password** - Use at least 12 characters with mixed case, numbers, and symbols
-3. **Unique Secret Key** - Never reuse secret keys across applications
-4. **Keep Config Secure** - Don't commit `config.yaml` with real credentials to version control
-5. **VPN/Private Network** - Keep NoteDiscovery on a private network or behind a VPN
+1. **Use HTTPS** — Run behind a reverse proxy (Traefik, nginx, Caddy)
+2. **Strong password** — At least 12 characters, mixed case, numbers, symbols
+3. **Unique secret key** — Never reuse across applications
+4. **Keep config secure** — Don't commit credentials to version control
 
 ---
 
-## 🚫 Disabling Authentication
+## API Key Authentication
 
-To disable authentication and allow open access:
+For external integrations (MCP servers, scripts, automation), use an API key instead of session cookies.
+
+### Setup
+
+```bash
+# Generate a secure key
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+**Via Environment Variable:**
+```bash
+docker run -e AUTHENTICATION_API_KEY=your_api_key ...
+```
+
+**Via config.yaml:**
+```yaml
+authentication:
+  api_key: "your_64_character_hex_key"
+```
+
+### Usage
+
+```bash
+# Option 1: Bearer token
+curl -H "Authorization: Bearer YOUR_API_KEY" http://localhost:8000/api/notes
+
+# Option 2: X-API-Key header
+curl -H "X-API-Key: YOUR_API_KEY" http://localhost:8000/api/notes
+```
+
+Both session auth (web UI) and API key auth work simultaneously when enabled.
+
+---
+
+## Disabling Authentication
 
 ```yaml
 authentication:
   enabled: false
 ```
 
-Restart the application, and authentication will be bypassed.
+Restart the app to apply.

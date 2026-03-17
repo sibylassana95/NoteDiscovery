@@ -70,6 +70,56 @@ DELETE /api/notes/{note_path}
 curl -X DELETE http://localhost:8000/api/notes/test.md
 ```
 
+### Append to Note
+```http
+PATCH /api/notes/{note_path}
+Content-Type: application/json
+
+{
+  "content": "Content to append...",
+  "add_timestamp": true
+}
+```
+
+Append content to an existing note without overwriting. Perfect for journals, logs, or collecting ideas incrementally.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `content` | string | Yes | Content to append to the note |
+| `add_timestamp` | boolean | No | If `true`, prepends a timestamp header (default: `false`) |
+
+**Response:**
+```json
+{
+  "success": true,
+  "path": "daily-journal.md",
+  "message": "Content appended successfully"
+}
+```
+
+**Example with timestamp:**
+```bash
+curl -X PATCH http://localhost:8000/api/notes/daily-journal.md \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Had a productive meeting about the roadmap.", "add_timestamp": true}'
+```
+
+This will append:
+```markdown
+
+---
+
+**2024-03-13 14:30**
+
+Had a productive meeting about the roadmap.
+```
+
+**Windows PowerShell:**
+```powershell
+curl.exe -X PATCH http://localhost:8000/api/notes/daily-journal.md -H "Content-Type: application/json" -d "{\"content\": \"New entry here\", \"add_timestamp\": true}"
+```
+
 ### Move Note
 ```http
 POST /api/notes/move
@@ -81,66 +131,93 @@ Content-Type: application/json
 }
 ```
 
-## 🖼️ Images
+## 🎬 Media
 
-### Get Image
+### Get Media
 ```http
-GET /api/images/{image_path}
+GET /api/media/{media_path}
 ```
-Retrieve an image file with authentication protection.
+Retrieve a media file (image, audio, video, PDF) with authentication protection.
 
 **Example:**
 ```bash
-curl http://localhost:8000/api/images/folder/_attachments/image-20240417093343.png
+curl http://localhost:8000/api/media/folder/_attachments/image-20240417093343.png
 ```
 
 **Security Note:** This endpoint requires authentication and validates that:
-- The image path is within the notes directory (prevents directory traversal)
-- The file exists and is a valid image format
+- The media path is within the notes directory (prevents directory traversal)
+- The file exists and is a valid media format
 - The requesting user is authenticated (if auth is enabled)
 
-### Upload Image
+### Upload Media
 ```http
-POST /api/upload-image
+POST /api/upload-media
 Content-Type: multipart/form-data
 
-file: <image file>
+file: <media file>
 note_path: <path of note to attach to>
 ```
 
-Upload an image file to the `_attachments` directory. Images are automatically organized per-folder and named with timestamps to prevent conflicts.
+Upload a media file to the `_attachments` directory. Files are automatically organized per-folder and named with timestamps to prevent conflicts.
 
-**Supported formats:** JPG, JPEG, PNG, GIF, WEBP  
-**Maximum size:** 10MB
+**Supported formats & size limits:**
+| Type | Formats | Max Size |
+|------|---------|----------|
+| Images | JPG, PNG, GIF, WebP | 10 MB |
+| Audio | MP3, WAV, OGG, M4A | 50 MB |
+| Video | MP4, WebM, MOV, AVI | 100 MB |
+| Documents | PDF | 20 MB |
 
 **Response:**
 ```json
 {
   "success": true,
-  "path": "folder/_attachments/image-20240417093343.png",
-  "filename": "image-20240417093343.png",
-  "message": "Image uploaded successfully"
+  "path": "folder/_attachments/media-20240417093343.png",
+  "filename": "media-20240417093343.png",
+  "message": "Media uploaded successfully"
 }
 ```
 
 **Example (using curl):**
 ```bash
-curl -X POST http://localhost:8000/api/upload-image \
-  -F "file=@/path/to/image.png" \
+curl -X POST http://localhost:8000/api/upload-media \
+  -F "file=@/path/to/file.mp3" \
   -F "note_path=folder/mynote.md"
 ```
 
 **Windows PowerShell:**
 ```powershell
-curl.exe -X POST http://localhost:8000/api/upload-image -F "file=@C:\path\to\image.png" -F "note_path=folder/mynote.md"
+curl.exe -X POST http://localhost:8000/api/upload-media -F "file=@C:\path\to\video.mp4" -F "note_path=folder/mynote.md"
+```
+
+### Move Media
+```http
+POST /api/media/move
+Content-Type: application/json
+
+{
+  "oldPath": "_attachments/image.png",
+  "newPath": "folder/_attachments/image.png"
+}
+```
+
+Move a media file to a different location. Supports drag & drop in the UI.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Media moved successfully",
+  "newPath": "folder/_attachments/image.png"
+}
 ```
 
 **Notes:**
-- Images are stored in `_attachments` folders relative to the note's location
-- Filenames are automatically timestamped (e.g., `image-20240417093343.png`)
-- Images appear in the sidebar navigation and can be viewed/deleted directly
-- Drag & drop images into the editor automatically uploads and inserts markdown
-- All image access requires authentication when security is enabled
+- Media is stored in `_attachments` folders relative to the note's location
+- Filenames are automatically timestamped (e.g., `media-20240417093343.mp3`)
+- Media appears in the sidebar navigation and can be viewed/deleted directly
+- Drag & drop files into the editor automatically uploads and inserts markdown
+- All media access requires authentication when security is enabled
 
 ## 📁 Folders
 
@@ -305,11 +382,11 @@ GET /health
 ```
 Returns system health status.
 
-### API Info
+### Swagger UI (Interactive Docs)
 ```http
 GET /api
 ```
-Self-documenting endpoint listing all available API routes.
+Interactive API documentation with try-it-out functionality (Swagger UI).
 
 ---
 
@@ -430,6 +507,75 @@ Creates a new note from a template with placeholder replacement.
 
 ---
 
+## 🔗 Sharing
+
+Share notes publicly without requiring authentication.
+
+### Create Share Link
+```http
+POST /api/share/{note_path}
+Content-Type: application/json
+
+{
+  "theme": "dracula"
+}
+```
+Creates a share token for the note. The `theme` is optional (defaults to "light").
+
+**Response:**
+```json
+{
+  "success": true,
+  "token": "LRFEo86oSVeJ3Gju",
+  "url": "http://localhost:8000/share/LRFEo86oSVeJ3Gju",
+  "note_path": "folder/note.md"
+}
+```
+
+### Get Share Status
+```http
+GET /api/share/{note_path}
+```
+Check if a note is currently shared.
+
+**Response:**
+```json
+{
+  "shared": true,
+  "token": "LRFEo86oSVeJ3Gju",
+  "url": "http://localhost:8000/share/LRFEo86oSVeJ3Gju",
+  "theme": "dracula",
+  "created": "2026-01-15T10:30:00+00:00"
+}
+```
+
+### Revoke Share
+```http
+DELETE /api/share/{note_path}
+```
+Removes public access to the note.
+
+### List Shared Notes
+```http
+GET /api/shared-notes
+```
+Returns paths of all currently shared notes.
+
+**Response:**
+```json
+{
+  "paths": ["folder/note.md", "another.md"]
+}
+```
+
+### View Shared Note (Public)
+```http
+GET /share/{token}
+```
+Public endpoint - no authentication required. Returns the note as a standalone HTML page with the theme set when sharing was created.
+
+---
+
 ## 📝 Response Format
 
 All endpoints return JSON responses:
@@ -450,5 +596,5 @@ All endpoints return JSON responses:
 ```
 ---
 
-💡 **Tip:** Use the `/api` endpoint to get a live, self-documented list of all available endpoints!
+💡 **Tip:** Visit `/api` for interactive Swagger UI documentation where you can try endpoints directly in your browser!
 
