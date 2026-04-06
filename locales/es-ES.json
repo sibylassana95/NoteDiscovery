@@ -105,6 +105,7 @@
     "delete_note": "Eliminar nota",
     "delete_image": "Eliminar imagen",
     "export_html": "Exportar como HTML",
+    "print_preview": "Vista previa de impresión",
     "copy_link": "Copiar enlace al portapapeles",
     "add_favorite": "Añadir a favoritos",
     "remove_favorite": "Quitar de favoritos"
@@ -154,6 +155,14 @@
     "title": "Esquema",
     "no_headings": "No se encontraron encabezados",
     "hint": "Añade encabezados usando sintaxis #"
+  },
+
+  "backlinks": {
+    "title": "Backlinks",
+    "no_backlinks": "No se encontraron backlinks",
+    "hint": "Otras notas aparecerán aquí cuando enlacen a esta nota",
+    "select_note": "Selecciona una nota para ver backlinks",
+    "more_refs": "más"
   },
 
   "stats": {
@@ -242,7 +251,9 @@
     "readable_line_length": "Longitud de línea legible",
     "readable_line_length_desc": "Limitar el ancho de vista previa para facilitar la lectura",
     "hide_underscore_folders": "Ocultar carpetas de sistema",
-    "hide_underscore_folders_desc": "Ocultar _attachments, _templates y otras carpetas con guion bajo"
+    "hide_underscore_folders_desc": "Ocultar _attachments, _templates y otras carpetas con guion bajo",
+    "tab_inserts_tab": "Tabulador inserta tabulación",
+    "tab_inserts_tab_desc": "Pulsa Tab para insertar un tabulador en lugar de cambiar el foco"
   },
 
   "homepage": {

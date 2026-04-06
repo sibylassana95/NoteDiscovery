@@ -104,6 +104,7 @@
     "delete_note": "Izbriši zapis",
     "delete_image": "Izbriši sliko",
     "export_html": "Izvozi kot HTML",
+    "print_preview": "Predogled tiskanja",
     "copy_link": "Kopiraj povezavo v odložišče",
     "add_favorite": "Dodaj med priljubljene",
     "remove_favorite": "Odstrani iz priljubljenih"
@@ -153,6 +154,14 @@
     "title": "Oris",
     "no_headings": "Ni najdenih naslovov",
     "hint": "Dodajte naslove s sintakso #"
+  },
+
+  "backlinks": {
+    "title": "Povratne povezave",
+    "no_backlinks": "Ni najdenih povratnih povezav",
+    "hint": "Druge beležke se bodo pojavile tukaj, ko se bodo nanašale na to beležko",
+    "select_note": "Izberite beležko za ogled povratnih povezav",
+    "more_refs": "več"
   },
 
   "stats": {
@@ -241,7 +250,9 @@
     "readable_line_length": "Berljiva dolžina vrstice",
     "readable_line_length_desc": "Omejite širino predogleda za lažje branje",
     "hide_underscore_folders": "Skrij sistemske mape",
-    "hide_underscore_folders_desc": "Skrij _attachments, _templates in druge mape s podčrtajem"
+    "hide_underscore_folders_desc": "Skrij _attachments, _templates in druge mape s podčrtajem",
+    "tab_inserts_tab": "Tipka Tab vstavi tabulator",
+    "tab_inserts_tab_desc": "Pritisnite Tab za vstavljanje tabulatorja namesto premikanja fokusa"
   },
 
   "homepage": {

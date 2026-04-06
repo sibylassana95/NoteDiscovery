@@ -42,6 +42,8 @@ from .utils import (
     get_templates,
     get_template_content,
     apply_template_placeholders,
+    paginate,
+    get_backlinks,
 )
 from .plugins import PluginManager
 from .themes import get_available_themes, get_theme_css
@@ -876,23 +878,48 @@ async def list_tags():
 
 
 @api_router.get("/tags/{tag_name}", tags=["Tags"])
-async def get_notes_by_tag_endpoint(tag_name: str):
+async def get_notes_by_tag_endpoint(
+    tag_name: str,
+    limit: Optional[int] = None,
+    offset: int = 0
+):
     """
-    Get all notes that have a specific tag.
-    
+    Get all notes that have a specific tag with optional pagination.
+
     Args:
         tag_name: The tag to filter by (case-insensitive)
-        
+        limit: Maximum number of notes to return (optional, no default limit)
+        offset: Number of notes to skip (default: 0)
+
     Returns:
         List of notes matching the tag
+    
+    Examples:
+        GET /api/tags/docker              -> All notes with #docker tag
+        GET /api/tags/docker?limit=10     -> First 10 notes with #docker tag
     """
     try:
         notes = get_notes_by_tag(config['storage']['notes_dir'], tag_name)
-        return {
+        
+        # Apply pagination with consistent sorting by path
+        paginated = paginate(
+            items=notes,
+            limit=limit,
+            offset=offset,
+            sort_key=lambda x: x.get('path', '').lower()
+        )
+        
+        response = {
             "tag": tag_name,
-            "count": len(notes),
-            "notes": notes
+            "count": paginated.total,
+            "notes": paginated.items
         }
+        
+        # Include pagination metadata only when limit is specified
+        if limit is not None:
+            response["pagination"] = paginated.to_dict()
+        
+        return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=safe_error_message(e, "Failed to get notes by tag"))
 
@@ -1004,33 +1031,74 @@ async def create_note_from_template(request: Request, data: dict):
 # --- Notes Endpoints ---
 
 @api_router.get("/notes", tags=["Notes"])
-async def list_notes():
-    """List all notes with metadata"""
+async def list_notes(
+    limit: Optional[int] = None,
+    offset: int = 0
+):
+    """
+    List all notes with metadata.
+    
+    Supports optional pagination for API consumers (MCP, scripts):
+    - No parameters: Returns all notes (frontend compatibility)
+    - With limit: Returns paginated results with metadata
+    
+    Args:
+        limit: Maximum number of notes to return (optional, no default limit)
+        offset: Number of notes to skip (default: 0)
+    
+    Examples:
+        GET /api/notes              -> All notes
+        GET /api/notes?limit=20     -> First 20 notes
+        GET /api/notes?limit=20&offset=20 -> Notes 21-40
+    """
     try:
         notes, folders = scan_notes_fast_walk(config['storage']['notes_dir'], include_media=True)
-        return {"notes": notes, "folders": folders}
+        
+        # Apply pagination with consistent sorting by path for stable results
+        result = paginate(
+            items=notes,
+            limit=limit,
+            offset=offset,
+            sort_key=lambda x: x.get('path', '').lower()
+        )
+        
+        response = {
+            "notes": result.items,
+            "folders": folders
+        }
+        
+        # Include pagination metadata only when limit is specified
+        if limit is not None:
+            response["pagination"] = result.to_dict()
+        
+        return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=safe_error_message(e, "Failed to list notes"))
 
 
 @api_router.get("/notes/{note_path:path}", tags=["Notes"])
-async def get_note(note_path: str):
-    """Get a specific note's content"""
+async def get_note(note_path: str, include_backlinks: bool = True):
+    """Get a specific note's content with optional backlinks"""
     try:
         content = get_note_content(config['storage']['notes_dir'], note_path)
         if content is None:
             raise HTTPException(status_code=404, detail="Note not found")
-        
+
         # Run on_note_load hook (can transform content, e.g., decrypt)
         transformed_content = plugin_manager.run_hook('on_note_load', note_path=note_path, content=content)
         if transformed_content is not None:
             content = transformed_content
-        
-        return {
+
+        response = {
             "path": note_path,
             "content": content,
             "metadata": create_note_metadata(config['storage']['notes_dir'], note_path)
         }
+        
+        if include_backlinks:
+            response["backlinks"] = get_backlinks(config['storage']['notes_dir'], note_path)
+        
+        return response
     except HTTPException:
         raise
     except Exception as e:
@@ -1160,19 +1228,149 @@ async def remove_note(request: Request, note_path: str):
         raise HTTPException(status_code=500, detail=safe_error_message(e, "Failed to delete note"))
 
 
+@api_router.get("/export/{note_path:path}", tags=["Export"])
+@limiter.limit("30/minute")
+async def export_note_to_html(request: Request, note_path: str, theme: Optional[str] = None, download: bool = True):
+    """
+    Export a note as a standalone HTML file.
+
+    The HTML includes all necessary CSS, MathJax, Mermaid, and syntax highlighting
+    for offline viewing. Images are embedded as base64.
+
+    Query Parameters:
+        theme: Optional theme name (defaults to current theme or 'light')
+        download: If true (default), returns as file download. If false, displays in browser with print button.
+
+    Returns:
+        HTML file (download or inline based on download parameter)
+    """
+    try:
+        notes_dir = Path(config['storage']['notes_dir'])
+        
+        # Read note content
+        content = get_note_content(str(notes_dir), note_path)
+        if content is None:
+            raise HTTPException(status_code=404, detail="Note not found")
+        
+        # Run on_note_load hook (can transform content, e.g., decrypt)
+        transformed_content = plugin_manager.run_hook('on_note_load', note_path=note_path, content=content)
+        if transformed_content is not None:
+            content = transformed_content
+        
+        # Strip YAML frontmatter (like the preview does)
+        content = strip_frontmatter(content)
+        
+        # Get note folder for resolving relative image paths
+        note_file_path = notes_dir / note_path
+        note_folder = note_file_path.parent
+        
+        # Embed images as base64
+        content_with_images = embed_images_as_base64(content, note_folder, notes_dir)
+        
+        # Convert wikilinks to decorative HTML links
+        content_with_links = convert_wikilinks_to_html(content_with_images)
+        
+        # Get theme CSS
+        themes_dir = Path(__file__).parent.parent / "themes"
+        theme_name = theme or 'light'
+        theme_css = get_theme_css(str(themes_dir), theme_name)
+        if not theme_css:
+            theme_css = get_theme_css(str(themes_dir), "light")
+            theme_name = "light"
+        
+        # Strip data-theme selector
+        theme_css = theme_css.replace(f':root[data-theme="{theme_name}"]', ':root')
+        theme_css = theme_css.replace(':root[data-theme="light"]', ':root')
+        theme_css = theme_css.replace(':root[data-theme="dark"]', ':root')
+        
+        # Determine if dark theme
+        is_dark = 'dark' in theme_name.lower() or theme_name in ['dracula', 'nord', 'monokai', 'cobalt2', 'gruvbox-dark']
+        
+        # Get note title
+        title = Path(note_path).stem
+        
+        # Generate HTML (show print button only when not downloading)
+        html_content = generate_export_html(
+            title=title,
+            content=content_with_links,
+            theme_css=theme_css,
+            is_dark=is_dark,
+            show_print_button=not download
+        )
+        
+        # Return as downloadable file or inline (for print preview)
+        if download:
+            filename = f"{title}.html"
+            return Response(
+                content=html_content,
+                media_type="text/html",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"'
+                }
+            )
+        else:
+            # Return inline for browser display (print preview)
+            return HTMLResponse(content=html_content)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=safe_error_message(e, "Failed to export note"))
+
+
 @api_router.get("/search", tags=["Search"])
-async def search(q: str):
-    """Search notes by content"""
+async def search(
+    q: str,
+    limit: Optional[int] = None,
+    offset: int = 0
+):
+    """
+    Search notes by content with optional pagination.
+    
+    Args:
+        q: Search query string
+        limit: Maximum number of results to return (optional, no default limit)
+        offset: Number of results to skip (default: 0)
+    
+    Examples:
+        GET /api/search?q=docker              -> All matching results
+        GET /api/search?q=docker&limit=10     -> First 10 results
+        GET /api/search?q=docker&limit=10&offset=10 -> Results 11-20
+    """
     try:
         if not config['search']['enabled']:
             raise HTTPException(status_code=403, detail="Search is disabled")
-        
+
+        # Handle empty query gracefully
+        if not q or not q.strip():
+            return {
+                "results": [],
+                "query": q,
+                "message": "No search term provided"
+            }
+
         results = search_notes(config['storage']['notes_dir'], q)
-        
+
         # Run plugin hooks
         plugin_manager.run_hook('on_search', query=q, results=results)
+
+        # Apply pagination with consistent sorting by path
+        paginated = paginate(
+            items=results,
+            limit=limit,
+            offset=offset,
+            sort_key=lambda x: x.get('path', '').lower()
+        )
         
-        return {"results": results, "query": q}
+        response = {
+            "results": paginated.items,
+            "query": q
+        }
+        
+        # Include pagination metadata only when limit is specified
+        if limit is not None:
+            response["pagination"] = paginated.to_dict()
+        
+        return response
     except HTTPException:
         raise
     except Exception as e:
@@ -1224,6 +1422,12 @@ async def get_graph():
                     # Match links that don't start with http://, https://, mailto:, #, etc.
                     markdown_links = re.findall(r'\[([^\]]+)\]\((?!https?://|mailto:|#|data:)([^\)]+)\)', content)
                     
+                    # Get source note's folder for resolving relative links
+                    # Use forward slashes consistently (note_paths uses forward slashes)
+                    source_folder = str(Path(note['path']).parent).replace('\\', '/')
+                    if source_folder == '.':
+                        source_folder = ''
+                    
                     # Process wikilinks
                     for target in wikilinks:
                         target = target.strip()
@@ -1232,20 +1436,34 @@ async def get_graph():
                         # Try to match target to an existing note
                         target_path = None
                         
-                        # 1. Exact path match
-                        if target in note_paths:
-                            target_path = target if target.endswith('.md') else target + '.md'
-                        # 2. Path with .md extension
-                        elif target + '.md' in note_paths:
-                            target_path = target + '.md'
-                        # 3. Case-insensitive path match (e.g., [[Folder/Note]] -> folder/note.md)
-                        elif target_lower in note_paths_lower:
-                            target_path = note_paths_lower[target_lower]
-                        elif target_lower + '.md' in note_paths_lower:
-                            target_path = note_paths_lower[target_lower + '.md']
-                        # 4. Just note name (case-insensitive)
-                        elif target_lower in note_names:
-                            target_path = note_names[target_lower]
+                        # 1. Try resolving relative to source note's folder first
+                        if source_folder and '/' not in target:
+                            relative_path = f"{source_folder}/{target}"
+                            relative_path_lower = relative_path.lower()
+                            
+                            if relative_path in note_paths:
+                                target_path = relative_path if relative_path.endswith('.md') else relative_path + '.md'
+                            elif relative_path + '.md' in note_paths:
+                                target_path = relative_path + '.md'
+                            elif relative_path_lower in note_paths_lower:
+                                target_path = note_paths_lower[relative_path_lower]
+                            elif relative_path_lower + '.md' in note_paths_lower:
+                                target_path = note_paths_lower[relative_path_lower + '.md']
+                        
+                        # 2. Exact path match (absolute or already has folder)
+                        if not target_path:
+                            if target in note_paths:
+                                target_path = target if target.endswith('.md') else target + '.md'
+                            elif target + '.md' in note_paths:
+                                target_path = target + '.md'
+                            # 3. Case-insensitive path match (e.g., [[Folder/Note]] -> folder/note.md)
+                            elif target_lower in note_paths_lower:
+                                target_path = note_paths_lower[target_lower]
+                            elif target_lower + '.md' in note_paths_lower:
+                                target_path = note_paths_lower[target_lower + '.md']
+                            # 4. Just note name (case-insensitive) - global match
+                            elif target_lower in note_names:
+                                target_path = note_names[target_lower]
                         
                         if target_path and target_path != note['path']:
                             edges.append({
@@ -1272,34 +1490,42 @@ async def get_graph():
                         
                         # Add .md extension if not present and doesn't have other extension
                         link_path_with_md = link_path if link_path.endswith('.md') else link_path + '.md'
-                        link_path_lower = link_path.lower()
-                        link_path_with_md_lower = link_path_with_md.lower()
                         
                         # Try to match target to an existing note
                         target_path = None
                         
-                        # 1. Exact path match (with or without .md)
-                        if link_path in note_paths:
-                            target_path = link_path if link_path.endswith('.md') else link_path + '.md'
-                        elif link_path_with_md in note_paths:
-                            target_path = link_path_with_md
-                        # 2. Case-insensitive path match
-                        elif link_path_lower in note_paths_lower:
-                            target_path = note_paths_lower[link_path_lower]
-                        elif link_path_with_md_lower in note_paths_lower:
-                            target_path = note_paths_lower[link_path_with_md_lower]
-                        # 3. Try matching by filename only (for relative links)
-                        else:
-                            # Extract just the filename
-                            filename = link_path.split('/')[-1]
-                            filename_lower = filename.lower()
-                            filename_with_md = filename if filename.endswith('.md') else filename + '.md'
-                            filename_with_md_lower = filename_with_md.lower()
+                        # 1. First, try resolving relative to source note's folder
+                        if source_folder and not link_path.startswith('/'):
+                            relative_path = f"{source_folder}/{link_path}"
+                            relative_path_with_md = f"{source_folder}/{link_path_with_md}"
+                            relative_path_lower = relative_path.lower()
+                            relative_path_with_md_lower = relative_path_with_md.lower()
                             
-                            if filename_lower in note_names:
-                                target_path = note_names[filename_lower]
-                            elif filename_with_md_lower in note_names:
-                                target_path = note_names[filename_with_md_lower]
+                            if relative_path in note_paths:
+                                target_path = relative_path if relative_path.endswith('.md') else relative_path + '.md'
+                            elif relative_path_with_md in note_paths:
+                                target_path = relative_path_with_md
+                            elif relative_path_lower in note_paths_lower:
+                                target_path = note_paths_lower[relative_path_lower]
+                            elif relative_path_with_md_lower in note_paths_lower:
+                                target_path = note_paths_lower[relative_path_with_md_lower]
+                        
+                        # 2. Try exact path match from root (for absolute paths or notes at root)
+                        if not target_path:
+                            link_path_lower = link_path.lower()
+                            link_path_with_md_lower = link_path_with_md.lower()
+                            
+                            if link_path in note_paths:
+                                target_path = link_path if link_path.endswith('.md') else link_path + '.md'
+                            elif link_path_with_md in note_paths:
+                                target_path = link_path_with_md
+                            # Case-insensitive path match
+                            elif link_path_lower in note_paths_lower:
+                                target_path = note_paths_lower[link_path_lower]
+                            elif link_path_with_md_lower in note_paths_lower:
+                                target_path = note_paths_lower[link_path_with_md_lower]
+                        
+                        # No global filename fallback for markdown links - they must resolve as paths
                         
                         if target_path and target_path != note['path']:
                             edges.append({
@@ -1360,6 +1586,67 @@ async def toggle_plugin(request: Request, plugin_name: str, enabled: dict):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=safe_error_message(e, "Failed to toggle plugin"))
+
+
+# ============================================================================
+# Stats Endpoint (for dashboards)
+# ============================================================================
+
+@api_router.get("/stats", tags=["Stats"])
+@limiter.limit("30/minute")
+async def get_stats(request: Request):
+    """
+    Get application statistics at a glance.
+
+    Designed for dashboard widgets (e.g., Homepage) - lightweight and cached.
+    Returns counts of notes, folders, tags, templates, media, and other metadata.
+    """
+    try:
+        notes_dir = config['storage']['notes_dir']
+        
+        # Get notes and folders (cached)
+        notes, folders = scan_notes_fast_walk(notes_dir, include_media=True)
+        
+        # Separate notes from media
+        note_items = [n for n in notes if n.get('type') == 'note']
+        media_items = [n for n in notes if n.get('type') != 'note']
+        
+        # Count unique tags
+        all_tags = set()
+        for note in note_items:
+            all_tags.update(note.get('tags', []))
+        
+        # Get templates count
+        templates = get_templates(notes_dir)
+        
+        # Calculate total size
+        total_size = sum(n.get('size', 0) for n in notes)
+        
+        # Get last modified (notes are already sorted by modified desc)
+        last_modified = note_items[0].get('modified') if note_items else None
+        
+        # Count enabled plugins
+        enabled_plugins = sum(1 for p in plugin_manager.plugins.values() if p.enabled)
+        
+        # Read version
+        version = "unknown"
+        version_file = Path(__file__).parent.parent / "VERSION"
+        if version_file.exists():
+            version = version_file.read_text().strip()
+        
+        return {
+            "notes_count": len(note_items),
+            "folders_count": len(folders),
+            "tags_count": len(all_tags),
+            "templates_count": len(templates),
+            "media_count": len(media_items),
+            "total_size_bytes": total_size,
+            "last_modified": last_modified,
+            "plugins_enabled": enabled_plugins,
+            "version": version
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=safe_error_message(e, "Failed to get stats"))
 
 
 # ============================================================================

@@ -14,6 +14,7 @@ MCP (Model Context Protocol) is an open standard that allows AI assistants to se
 - 📂 **Organize** notes (move, rename, folders)
 - 📋 **Use templates** to create structured notes
 - 🔗 **Explore** the knowledge graph
+- 🔙 **Discover backlinks** (notes that link to a specific note)
 
 ## Quick Setup
 
@@ -114,8 +115,8 @@ The MCP server provides these tools to AI assistants:
 
 | Tool | Description |
 |------|-------------|
-| `search_notes` | Full-text search across all notes |
-| `list_notes` | List all notes with metadata |
+| `search_notes` | Full-text search across all notes (supports pagination) |
+| `list_notes` | List all notes with metadata (supports pagination) |
 | `get_note` | Read a specific note's content |
 | `get_recent_notes` | Get recently modified notes (last N days) |
 
@@ -124,8 +125,9 @@ The MCP server provides these tools to AI assistants:
 | Tool | Description |
 |------|-------------|
 | `list_tags` | List all tags with note counts |
-| `get_notes_by_tag` | Find notes with a specific tag |
+| `get_notes_by_tag` | Find notes with a specific tag (supports pagination) |
 | `get_graph` | Get knowledge graph data |
+| `get_backlinks` | Get notes that link to a specific note (reverse links) |
 
 ### Note Management
 
@@ -152,6 +154,42 @@ The MCP server provides these tools to AI assistants:
 | `health_check` | Verify server connectivity |
 
 ## Tool Details
+
+### Pagination with `max_results` and `offset`
+
+Some tools support optional pagination parameters for large vaults:
+
+| Tool | Parameters | Description |
+|------|------------|-------------|
+| `search_notes` | `max_results`, `offset` | Paginate search results |
+| `list_notes` | `max_results`, `offset` | Paginate notes list |
+| `get_notes_by_tag` | `max_results`, `offset` | Paginate notes by tag |
+
+- `max_results` - Maximum items to return (omit for all)
+- `offset` - Number of items to skip (for pagination)
+
+**Example prompts:**
+- "Search for notes about Python, but just show me the first 5 results"
+- "Show me the next 5 Python notes" (uses offset)
+
+---
+
+### `get_backlinks`
+
+Find all notes that link TO a specific note (reverse links / backlinks). Useful for understanding how a note connects to your knowledge base.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `path` | string | Yes | Path to the note to find backlinks for |
+
+**Returns:** List of notes that contain links to the specified note, with context snippets showing where the link appears.
+
+**Example prompts:**
+- "What notes link to my Project Alpha note?"
+- "Show me the backlinks for meeting-notes.md"
+- "Find all notes that reference my API documentation"
+
+---
 
 ### `append_to_note`
 
@@ -246,6 +284,12 @@ Once configured, you can interact with your notes naturally:
 > **AI:** *Uses `create_note_from_template` with the meeting-notes template*
 > 
 > "Created 'meetings/design-review-2024-03-13.md' from your meeting-notes template."
+
+> **User:** "What notes link to my Project Alpha document?"
+> 
+> **AI:** *Uses `get_backlinks` to find reverse links*
+> 
+> "3 notes reference Project Alpha: your meeting notes from March 12, the quarterly review, and the team standup notes..."
 
 ## Authentication
 

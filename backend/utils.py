@@ -7,9 +7,108 @@ import re
 import shutil
 import threading
 import time
+import urllib.parse
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any, TypeVar, Callable
 from datetime import datetime, timezone
+
+
+# ============================================================================
+# Pagination Support
+# ============================================================================
+
+@dataclass
+class PaginationResult:
+    """
+    Result of applying pagination to a list.
+    
+    Attributes:
+        items: The paginated subset of items
+        total: Total number of items before pagination
+        limit: The limit that was applied (None if no pagination)
+        offset: The offset that was applied
+        has_more: Whether there are more items after this page
+    """
+    items: List[Any]
+    total: int
+    limit: Optional[int]
+    offset: int
+    has_more: bool
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert pagination info to dict for API response."""
+        return {
+            "limit": self.limit,
+            "offset": self.offset,
+            "total": self.total,
+            "has_more": self.has_more
+        }
+
+
+T = TypeVar('T')
+
+
+def paginate(
+    items: List[T],
+    limit: Optional[int] = None,
+    offset: int = 0,
+    sort_key: Optional[Callable[[T], Any]] = None,
+    sort_reverse: bool = False
+) -> PaginationResult:
+    """
+    Apply optional pagination to a list with consistent sorting.
+    
+    This function is designed to be backward-compatible:
+    - If limit is None, returns all items (no pagination)
+    - If limit is provided, returns a paginated subset
+    
+    Sorting is always applied (when sort_key is provided) to ensure
+    stable pagination across requests.
+    
+    Args:
+        items: List of items to paginate
+        limit: Maximum number of items to return (None = no limit)
+        offset: Number of items to skip (default: 0)
+        sort_key: Function to extract sort key from item (e.g., lambda x: x['path'])
+        sort_reverse: If True, sort in descending order
+        
+    Returns:
+        PaginationResult with items and pagination metadata
+        
+    Example:
+        # No pagination (frontend compatibility)
+        result = paginate(notes)
+        
+        # With pagination (MCP usage)
+        result = paginate(notes, limit=20, offset=0, sort_key=lambda x: x['path'])
+    """
+    total = len(items)
+    
+    # Apply sorting for consistent ordering (prevents out-of-order issues)
+    if sort_key is not None:
+        items = sorted(items, key=sort_key, reverse=sort_reverse)
+    
+    # Apply pagination only if limit is specified
+    if limit is not None:
+        # Clamp offset to valid range
+        offset = max(0, min(offset, total))
+        end = offset + limit
+        paginated_items = items[offset:end]
+        has_more = end < total
+    else:
+        # No pagination - return all items
+        paginated_items = items
+        offset = 0
+        has_more = False
+    
+    return PaginationResult(
+        items=paginated_items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        has_more=has_more
+    )
 
 
 # In-memory cache for parsed tags
@@ -885,4 +984,142 @@ def apply_template_placeholders(content: str, note_path: str) -> str:
         result = result.replace(placeholder, value)
     
     return result
+
+
+def get_backlinks(notes_dir: str, target_note_path: str) -> List[Dict]:
+    """
+    Find all notes that link TO the specified note (reverse links / backlinks).
+
+    Args:
+        notes_dir: Base directory containing notes
+        target_note_path: Path of the note to find backlinks for
+
+    Returns:
+        List of backlink objects with path, context, and line_number
+    """
+    backlinks = []
+    notes, _folders = scan_notes_fast_walk(notes_dir, include_media=False)
+    
+    # Normalize target path for matching
+    target_path = target_note_path
+    target_path_lower = target_path.lower()
+    target_path_no_ext = target_path.replace('.md', '')
+    target_path_no_ext_lower = target_path_no_ext.lower()
+    target_name = Path(target_path).stem.lower()
+    
+    # For wikilinks: global name matching (find note anywhere by name)
+    wikilink_refs = {
+        target_path_lower,
+        target_path_no_ext_lower,
+        target_name,
+    }
+    
+    for note in notes:
+        if note.get('type') != 'note':
+            continue
+        
+        source_path = note['path']
+        
+        # Skip self-references
+        if source_path == target_path:
+            continue
+        
+        # Get source folder for resolving relative markdown links
+        source_folder = str(Path(source_path).parent).replace('\\', '/')
+        if source_folder == '.':
+            source_folder = ''
+        
+        # Read note content
+        full_path = Path(notes_dir) / source_path
+        try:
+            with open(full_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except Exception:
+            continue
+        
+        lines = content.split('\n')
+        found_links = []
+        
+        for line_num, line in enumerate(lines, 1):
+            # Find wikilinks: [[target]] or [[target|display]]
+            # Wikilinks use GLOBAL matching (find note anywhere by name)
+            wikilink_matches = re.finditer(r'\[\[([^\]|]+)(?:\|[^\]]+)?\]\]', line)
+            for match in wikilink_matches:
+                link_target = match.group(1).strip().lower()
+                link_target_no_ext = link_target.replace('.md', '')
+                
+                # Check if this wikilink points to our target (global match)
+                if link_target in wikilink_refs or link_target_no_ext in wikilink_refs:
+                    start = max(0, match.start() - 30)
+                    end = min(len(line), match.end() + 30)
+                    context = line[start:end]
+                    if start > 0:
+                        context = '...' + context
+                    if end < len(line):
+                        context = context + '...'
+                    
+                    found_links.append({
+                        "line_number": line_num,
+                        "context": context,
+                        "type": "wikilink"
+                    })
+            
+            # Find markdown links: [text](path)
+            # Markdown links must RESOLVE as paths (relative to source or absolute)
+            markdown_matches = re.finditer(r'\[([^\]]+)\]\((?!https?://|mailto:|#|data:)([^\)]+)\)', line)
+            for match in markdown_matches:
+                link_path = match.group(2).split('#')[0]  # Remove anchor
+                if not link_path:
+                    continue
+                
+                link_path = urllib.parse.unquote(link_path)
+                if link_path.startswith('./'):
+                    link_path = link_path[2:]
+                
+                # Add .md if not present
+                link_path_with_md = link_path if link_path.endswith('.md') else link_path + '.md'
+                
+                # Resolve the link path to get the actual target
+                resolved_path = None
+                
+                # 1. Try resolving relative to source folder
+                if source_folder and not link_path.startswith('/'):
+                    relative_path = f"{source_folder}/{link_path_with_md}"
+                    if relative_path.lower() == target_path_lower:
+                        resolved_path = target_path
+                    elif f"{source_folder}/{link_path}".lower() == target_path_no_ext_lower:
+                        resolved_path = target_path
+                
+                # 2. Try as absolute path from root
+                if not resolved_path:
+                    if link_path_with_md.lower() == target_path_lower:
+                        resolved_path = target_path
+                    elif link_path.lower() == target_path_no_ext_lower:
+                        resolved_path = target_path
+                
+                # Only add if the resolved path matches the target
+                if resolved_path:
+                    start = max(0, match.start() - 30)
+                    end = min(len(line), match.end() + 30)
+                    context = line[start:end]
+                    if start > 0:
+                        context = '...' + context
+                    if end < len(line):
+                        context = context + '...'
+                    
+                    found_links.append({
+                        "line_number": line_num,
+                        "context": context,
+                        "type": "markdown"
+                    })
+        
+        # If we found links in this note, add it to backlinks
+        if found_links:
+            backlinks.append({
+                "path": source_path,
+                "name": note['name'].replace('.md', ''),
+                "references": found_links[:3]  # Limit to 3 references per note
+            })
+    
+    return backlinks
 

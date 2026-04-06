@@ -7,23 +7,88 @@ Base URL: `http://localhost:8000`
 ### List All Notes
 ```http
 GET /api/notes
+GET /api/notes?limit=20&offset=0
 ```
 Returns all notes with their metadata and folder structure.
 
-**Example:**
+**Optional Pagination:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | - | Max notes to return (omit for all) |
+| `offset` | integer | 0 | Number of notes to skip |
+
+When `limit` is provided, the response includes pagination metadata.
+
+**Examples:**
 ```bash
+# Get all notes (default)
 curl http://localhost:8000/api/notes
+
+# Get first 20 notes
+curl "http://localhost:8000/api/notes?limit=20"
+
+# Get notes 21-40
+curl "http://localhost:8000/api/notes?limit=20&offset=20"
 ```
 
 ### Get Note Content
 ```http
 GET /api/notes/{note_path}
 ```
-Retrieve the content of a specific note.
+Retrieve the content of a specific note, including metadata and backlinks.
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `include_backlinks` | boolean | `true` | Include backlinks (notes that link to this note) |
 
 **Example:**
 ```bash
 curl http://localhost:8000/api/notes/folder/mynote.md
+```
+
+**Response:**
+```json
+{
+  "path": "folder/mynote.md",
+  "content": "# My Note\n\nNote content here...",
+  "metadata": {
+    "created": "2026-03-15T10:00:00+01:00",
+    "modified": "2026-03-17T14:30:00+01:00",
+    "size": 1234,
+    "lines": 42
+  },
+  "backlinks": [
+    {
+      "path": "meetings/standup.md",
+      "name": "standup",
+      "references": [
+        {
+          "line_number": 15,
+          "context": "...discussed [[mynote]]...",
+          "type": "wikilink"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Backlinks Response Fields:**
+
+| Field | Description |
+|-------|-------------|
+| `path` | Path of the note that links to this note |
+| `name` | Display name of the linking note |
+| `references` | Array of link occurrences (max 3 per note) |
+| `references[].line_number` | Line number where the link appears |
+| `references[].context` | Text snippet around the link |
+| `references[].type` | Link type: `wikilink` or `markdown` |
+
+**Without Backlinks:**
+```bash
+curl "http://localhost:8000/api/notes/folder/mynote.md?include_backlinks=false"
 ```
 
 ### Create/Update Note
@@ -269,11 +334,22 @@ Content-Type: application/json
 ### Search Notes
 ```http
 GET /api/search?q={query}
+GET /api/search?q={query}&limit=10&offset=0
 ```
 
-**Example:**
+**Optional Pagination:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | - | Max results to return (omit for all) |
+| `offset` | integer | 0 | Number of results to skip |
+
+**Examples:**
 ```bash
+# Search all matches
 curl "http://localhost:8000/api/search?q=hello"
+
+# Get first 10 results
+curl "http://localhost:8000/api/search?q=hello&limit=10"
 ```
 
 ## 🎨 Themes
@@ -368,6 +444,55 @@ Returns the relationship graph between notes with link detection.
 - **Markdown links** - `[text](note.md)` standard internal links
 - **Edge types** - `"wikilink"` or `"markdown"` to distinguish link source
 
+---
+
+## 📤 Export
+
+### Export Note as HTML
+```http
+GET /api/export/{note_path}?theme={theme_name}&download={true|false}
+```
+
+Exports a note as a standalone HTML file with all dependencies embedded for offline viewing.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `note_path` | path | Path to the note (e.g., `folder/note.md`) |
+| `theme` | query (optional) | Theme name for styling (defaults to `light`) |
+| `download` | query (optional) | If `true` (default), returns as file download. If `false`, displays in browser with Print/Close buttons for print preview |
+
+**Response:**
+- `download=true`: Returns an HTML file with `Content-Disposition: attachment` header
+- `download=false`: Returns inline HTML for browser display (print preview mode)
+
+**Features:**
+- Fully self-contained HTML with embedded CSS
+- Images converted to base64 data URLs
+- MathJax for LaTeX math rendering (supports `$...$`, `$$...$$`, `\(...\)`, `\[...\]`)
+- Mermaid.js for diagram rendering
+- Highlight.js for syntax highlighting
+- Wikilinks converted to decorative spans
+- YAML frontmatter stripped
+- Responsive design with print support
+- Print toolbar with Print/Close buttons (preview mode only)
+
+**Rate Limit:** 30 requests/minute
+
+**Example:**
+```bash
+# Export with default theme (downloads file)
+curl -O http://localhost:8000/api/export/notes/Welcome.md
+
+# Export with dark theme (downloads file)
+curl -O "http://localhost:8000/api/export/docs/API.md?theme=dracula"
+
+# Print preview (open in browser)
+# http://localhost:8000/api/export/docs/API.md?theme=light&download=false
+```
+
+---
+
 ## ⚙️ System
 
 ### Get Config
@@ -375,6 +500,60 @@ Returns the relationship graph between notes with link detection.
 GET /api/config
 ```
 Returns application configuration.
+
+### Get Stats
+```http
+GET /api/stats
+```
+Returns application statistics at a glance. Designed for dashboard widgets (e.g., Homepage) - lightweight and uses cached data.
+
+**Response:**
+```json
+{
+  "notes_count": 142,
+  "folders_count": 12,
+  "tags_count": 37,
+  "templates_count": 5,
+  "media_count": 23,
+  "total_size_bytes": 2458624,
+  "last_modified": "2026-03-17T14:32:00Z",
+  "plugins_enabled": 3,
+  "version": "0.19.1"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `notes_count` | Total number of markdown notes |
+| `folders_count` | Total number of folders |
+| `tags_count` | Number of unique tags across all notes |
+| `templates_count` | Number of templates in `_templates` folder |
+| `media_count` | Number of media files (images, etc.) |
+| `total_size_bytes` | Total size of all files in bytes |
+| `last_modified` | ISO timestamp of most recently modified note |
+| `plugins_enabled` | Number of enabled plugins |
+| `version` | Application version |
+
+**Example ([Homepage](https://gethomepage.dev/) dashboard widget):**
+```yaml
+- NoteDiscovery:
+    href: https://notediscovery.homelab.local
+    icon: notediscovery
+    container: homelab-notediscovery
+    widget:
+      type: customapi
+      url: http://notediscovery:8000/api/stats
+      refreshInterval: 60000
+      mappings:
+        - field: notes_count
+          label: Notes
+        - field: tags_count
+          label: Tags
+        - field: folders_count
+          label: Folders
+        - field: version
+          label: Version
+```
 
 ### Health Check
 ```http
@@ -409,14 +588,24 @@ Returns all tags found in notes with their usage counts.
 ```
 
 ### Get Notes by Tag
-`GET /api/tags/{tag_name}`
+```http
+GET /api/tags/{tag_name}
+GET /api/tags/{tag_name}?limit=10&offset=0
+```
 
 Returns all notes that have a specific tag.
+
+**Optional Pagination:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | - | Max notes to return (omit for all) |
+| `offset` | integer | 0 | Number of notes to skip |
 
 **Response:**
 ```json
 {
   "tag": "python",
+  "count": 5,
   "notes": [
     {
       "path": "tutorials/python-basics.md",
